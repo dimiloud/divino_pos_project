@@ -1,0 +1,21 @@
+<!-- confirm_credit_modal.html -->
+<div class="modal fade" id="confirmApplyCreditModal" tabindex="-1" aria-labelledby="confirmApplyCreditModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'pos' %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmApplyCreditModalLabel">Confirmer l'application du crédit</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Êtes-vous sûr de vouloir appliquer le crédit disponible de {{ selected_client.credit|floatformat:2 }} € ?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" name="apply_credit" class="btn btn-primary">Confirmer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

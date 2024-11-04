@@ -1,0 +1,104 @@
+<!-- divino_pos/templates/transaction_detail.html -->
+
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    table {
+        border-collapse: separate; /* Nécessaire pour que border-radius fonctionne */
+        border-spacing: 0;
+        width: 100%;
+        border: 1px solid #ddd;
+        border-radius: 10px; /* Ajustez la valeur pour changer le rayon des coins */
+        overflow: hidden; /* Pour que le contenu respecte les coins arrondis */
+    }
+    
+    thead th {
+        background-color: #f2f2f2;
+        color: #333;
+        padding: 12px;
+        text-align: left;
+    }
+    
+    tbody td {
+        padding: 12px;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    tbody tr:last-child td {
+        border-bottom: none; /* Retire la bordure de la dernière ligne */
+    }
+    </style>
+<div class="container mt-5">
+    <h1>Détails de la Transaction #{{ transaction.id }}</h1>
+    <hr>
+    <div class="row">
+        <div class="col-md-6">
+            <h4>Informations sur le Client</h4>
+            <p><strong>Nom :</strong> {{ transaction.client.prenom }} {{ transaction.client.nom }}</p>
+            <p><strong>Email :</strong> {{ transaction.client.email }}</p>
+            <p><strong>Points Appliqués :</strong> {{ transaction.points_applied|floatformat:2 }} €</p>
+            <p><strong>Points de Fidélité gagnés :</strong> {{ transaction.client.fidelity_points|floatformat:2 }}</p>
+            
+        </div>
+        <div class="col-md-6">
+            <h4>Informations sur la Transaction</h4>
+            <p><strong>Date de la Transaction :</strong> {{ transaction.date|date:"d/m/Y H:i" }}</p>
+            <p><strong>Total des Réductions :</strong> {{ transaction.total_reduction|floatformat:2 }} €</p>
+            <p><strong>Crédit Appliqué :</strong> {{ transaction.credit_applied|floatformat:2 }} €</p>
+            
+            <p><strong>Mode de Paiement :</strong> {{ transaction.mode_paiement }}</p>
+        </div>
+    </div>
+    <hr>
+    <h4>Résumé des Produits</h4>
+    <div class="table-responsive">
+        <table class="table table-striped table-bordered">
+            <thead class="table-dark">
+                <tr>
+                    <th>#</th>
+                    <th>Produit</th>
+                    <th>Quantité</th>
+                    <th>Prix Unitaire (€)</th>
+                    <th>Montant de Réduction (€)</th>
+                    <th>Total (€)</th>
+                    <th>Retourné</th>
+                    <th>Points de Fidélité Retirés</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in items_with_returns %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ entry.item.product.nom_article }}</td>
+                    <td>{{ entry.item.quantity }}</td>
+                    <td>{{ entry.item.price|floatformat:2 }}</td>
+                    <td>{{ entry.item.reduction|floatformat:2 }}</td>
+                    <td>{{ entry.total_item|floatformat:2 }}</td>
+                    <td>
+                        {% if entry.returned_quantity > 0 %}
+                            <span class="badge bg-danger">{{ entry.returned_quantity }} retourné(s)</span>
+                            <p>Montant retourné : {{ entry.returned_amount|floatformat:2 }} €</p>
+                        {% else %}
+                            <span class="badge bg-success">Non retourné</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if entry.points_removed > 0 %}
+                            {{ entry.points_removed|floatformat:2 }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p><strong>Total à Payer :</strong> {{ transaction.total_price|floatformat:2 }} €</p>
+    <hr>
+    <a href="{% url 'sales_history' %}" class="btn btn-primary mt-3">Retour à l'Historique des vente</a>
+    <a href="{% url 'pos' %}" class="btn btn-secondary mt-3">Retour au POS</a>
+</div>
+{% endblock %}

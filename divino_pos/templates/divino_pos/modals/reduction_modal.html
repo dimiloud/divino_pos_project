@@ -1,0 +1,23 @@
+<!-- reduction_modal.html -->
+<div class="modal fade" id="reductionModal" tabindex="-1" aria-labelledby="reductionModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Appliquer une réduction</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="{% url 'apply_discount' %}">
+                    {% csrf_token %}
+                    <input type="hidden" id="code_ean_input" name="code_ean" value="">
+                    <div class="mb-3">
+                        <label for="discount_percentage" class="form-label">Pourcentage de réduction (%)</label>
+                        <input type="number" class="form-control" id="discount_percentage" 
+                               name="discount_percentage" min="0" max="100" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Appliquer la réduction</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

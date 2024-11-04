@@ -1,0 +1,35 @@
+<!-- divino_pos/templates/divino_pos/purchase_detail.html -->
+
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1>Détails de l'Achat #{{ purchase.id }}</h1>
+    <hr>
+    <div class="row">
+        <div class="col-md-6">
+            <h4>Informations sur le Client</h4>
+            <p><strong>Nom :</strong> {{ purchase.client.prenom }} {{ purchase.client.nom }}</p>
+            <p><strong>Email :</strong> {{ purchase.client.email }}</p>
+            <p><strong>Points de Fidélité :</strong> {{ purchase.client.fidelity_points|floatformat:2 }}</p>
+            <p><strong>Points de Fidélité utilisés :</strong> {{ points_utilises|floatformat:2 }}</p>
+            <p><strong>Points de Fidélité restants :</strong> {{ purchase.client.fidelity_points|floatformat:2 }}</p>
+        </div>
+        <div class="col-md-6">
+            <h4>Informations sur le Produit</h4>
+            <p><strong>Produit :</strong> {{ purchase.product.nom_article }}</p>
+            <p><strong>Prix Unitaire :</strong> {{ purchase.product.prix_vente|floatformat:2 }} €</p>
+            <p><strong>Quantité :</strong> {{ purchase.quantity }}</p>
+            <p><strong>Montant de Réduction :</strong> -{{ purchase.montant_reduction|floatformat:2 }} €</p>
+        </div>
+    </div>
+    <hr>
+    <h4>Résumé de l'Achat</h4>
+    <p><strong>Total :</strong> {{ purchase.total_price|floatformat:2 }} €</p>
+    <p><strong>Date de l'Achat :</strong> {{ purchase.date|date:"d/m/Y H:i" }}</p>
+    <hr>
+    <a href="{% url 'client_history' purchase.client.id %}" class="btn btn-primary">Retour à l'Historique du Client</a>
+    <a href="{% url 'pos' %}" class="btn btn-secondary">Retour au POS</a>
+</div>
+{% endblock %}

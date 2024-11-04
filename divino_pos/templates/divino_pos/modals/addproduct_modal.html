@@ -1,0 +1,45 @@
+<!-- Modale pour ajouter un produit manuellement -->
+<div class="modal fade" id="addProductModal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{% url 'add_product' %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addProductModalLabel">Ajouter un Produit</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Afficher les erreurs non liées aux champs -->
+                    {% if product_form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {{ product_form.non_field_errors }}
+                        </div>
+                    {% endif %}
+                    {% for field in product_form %}
+                        <div class="mb-3">
+                            {{ field.label_tag }}
+                            {{ field }}
+                            {% if field.errors %}
+                                <div class="text-danger">{{ field.errors }}</div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Ajouter le Produit</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Script pour réouvrir la modale si nécessaire -->
+{% if show_add_product_modal %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var addProductModal = new bootstrap.Modal(document.getElementById('addProductModal'));
+        addProductModal.show();
+    });
+</script>
+{% endif %}

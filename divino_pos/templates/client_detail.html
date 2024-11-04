@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    table {
+        border-collapse: separate; /* Nécessaire pour que border-radius fonctionne */
+        border-spacing: 0;
+        width: 100%;
+        border: 1px solid #ddd;
+        border-radius: 10px; /* Ajustez la valeur pour changer le rayon des coins */
+        overflow: hidden; /* Pour que le contenu respecte les coins arrondis */
+    }
+    
+    thead th {
+        background-color: #f2f2f2;
+        color: #333;
+        padding: 12px;
+        text-align: left;
+    }
+    
+    tbody td {
+        padding: 12px;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    tbody tr:last-child td {
+        border-bottom: none; /* Retire la bordure de la dernière ligne */
+    }
+    </style>
+<div class="container mt-5">
+    <h1>Détails du Client</h1>
+    <hr>
+
+    <p><strong>Numéro de carte :</strong> {{ client.n_carte }}</p>
+    <p><strong>Nom :</strong> {{ client.nom }}</p>
+    <p><strong>Prénom :</strong> {{ client.prenom }}</p>
+    <p><strong>Date d'anniversaire :</strong> {{ client.date_anniversaire|date:"d-m-Y" }}</p>
+    <p><strong>Email :</strong> {{ client.email }}</p>
+    <p><strong>Adresse :</strong> {{ client.numero_rue }}, {{ client.code_postal }} {{ client.ville }}</p>
+    <p><strong>Pays :</strong> {{ client.pays }}</p>
+    <p><strong>Téléphone :</strong> {{ client.telephone }}</p>
+    <p><strong>Credit : :</strong> {{ client.credit }}</p>
+    <p><strong>Points de fidélité :</strong> {{ client.fidelity_points }}</p>
+
+    <a href="{% url 'client_list' %}" class="btn btn-primary">Retour à la liste des clients</a>
+</div>
+{% endblock %}
+

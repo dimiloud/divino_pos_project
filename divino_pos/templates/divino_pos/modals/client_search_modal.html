@@ -1,0 +1,27 @@
+<!-- client_search_modal.html -->
+<div class="modal fade" id="clientSearchModal" tabindex="-1" aria-labelledby="clientSearchModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Sélectionnez un client</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Plusieurs clients trouvés :</p>
+                <ul class="list-group">
+                    {% for client in search_results %}
+                    <li class="list-group-item">
+                        <form method="POST" action="{% url 'pos' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="selected_client_id" value="{{ client.id }}">
+                            <button type="submit" class="btn btn-link">
+                                {{ client.prenom }} {{ client.nom }} - {{ client.email }}
+                            </button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>

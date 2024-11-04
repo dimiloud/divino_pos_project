@@ -1,0 +1,246 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="row g-4">
+        <!-- COLONNE GAUCHE -->
+        <div class="col-lg-3">
+            <!-- Carte de Recherche Produit -->
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Recherche Produit</h5>
+                    <form method="POST" action="{% url 'pos' %}">
+                        {% csrf_token %}
+                        <div class="input-group">
+                            <input type="text" class="form-control" name="code_ean" placeholder="Code EAN ou Code Article" aria-label="Code EAN ou Code Article">
+                            <button class="btn btn-primary" type="submit">Ajouter</button>
+                        </div>
+                    </form>
+                    <!-- Nouveau Bouton -->
+                    <button class="btn btn-secondary mt-3" data-bs-toggle="modal" data-bs-target="#addProductModal">
+                        Ajout manuel
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2. Carte Réductions et Points -->
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h5 class="card-title">Réductions et Points</h5>
+                    {% if credit_applique > 0 %}
+                        <p class="fs-7 text-success">Crédit appliqué : {{ credit_applique|floatformat:2 }} €</p>
+                    {% endif %}
+                    
+                    {% if total_item_reductions > 0 %}
+                        <p class="fs-7 text-dark">Réductions sur articles : -{{ total_item_reductions|floatformat:2 }} €</p>
+                    {% endif %}
+                    
+                    {% if points_appliques > 0 %}
+                        <p class="fs-7 text-success">Points de fidélité appliqués : -{{ points_appliques|floatformat:2 }} €</p>
+                    {% endif %}
+                    
+                    {% if global_reduction_amount > 0 %}
+                        <p class="fs-7 text-primary">Réduction globale : -{{ global_reduction_amount|floatformat:2 }} €</p>
+                    {% endif %}
+                    
+                    {% if total_reduction > 0 %}
+                        <p class="fs-7 text-danger">Total des réductions : -{{ total_reduction|floatformat:2 }} €</p>
+                    {% else %}
+                        <p class="fs-7 text-secondary">Pas de réduction appliquée.</p>
+                    {% endif %}
+                    
+                    <button class="btn btn-secondary mt-3 w-100" onclick="openGlobalReductionModal()">
+                        Appliquer une réduction globale (%)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- COLONNE CENTRALE -->
+        <div class="col-lg-6">
+            <!-- Carte Panier -->
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Votre Panier</h5>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Produit</th>
+                                    <th>Quantité</th>
+                                    <th>Prix Unitaire (€)</th>
+                                    <th>Total (€)</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for code_ean, item in panier.items %}
+                                <tr>
+                                    <td>{{ item.nom }}</td>
+                                    <td>{{ item.quantite|floatformat:0 }}</td>
+                                    <td>
+                                        {% if item.reduction %}
+                                            <del>{{ item.prix_original|floatformat:2 }} €</del> 
+                                            {{ item.prix_vente|floatformat:2 }} €
+                                            <br>
+                                            Réduction : -{{ item.montant_reduction|floatformat:2 }} €
+                                        {% else %}
+                                            {{ item.prix_vente|floatformat:2 }} €
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.total|floatformat:2 }} €</td>
+                                    <td>
+                                        <a href="{% url 'remove_from_cart' code_ean %}" class="btn btn-danger btn-sm">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </a>
+                                        <button class="btn btn-success btn-sm" data-code-ean="{{ code_ean }}" 
+                                                onclick="openReductionModal(this)">%</button>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center">Aucun produit dans le panier.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex justify-content-end mt-3">
+                        <h5>Total à Payer : {{ total_a_payer|floatformat:2 }} €</h5>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-3">
+                        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal">
+                            Finaliser la Vente
+                        </button>
+                        <a href="{% url 'cancel_sale' %}" class="btn btn-danger">Annuler la Transaction</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- COLONNE DROITE -->
+        <div class="col-lg-3">
+            <!-- 1. Carte Recherche Client -->
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Recherche Client</h5>
+                    <form method="GET" action="{% url 'pos' %}">
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control" name="search_client" 
+                                   placeholder="Nom, Prénom ou Email">
+                            <button class="btn btn-primary" type="submit">Rechercher</button>
+                        </div>
+                    </form>
+                    <!-- Nouveau Bouton pour Ajouter un Client -->
+                    <button class="btn btn-secondary mt-2" data-bs-toggle="modal" data-bs-target="#addClientModal">
+                        Ajouter un client
+                    </button>
+
+                    {% if selected_client %}
+                    <div class="alert alert-success">
+                        <p>Client Sélectionné : {{ selected_client.prenom }} {{ selected_client.nom }}</p>
+                        <p>Crédit disponible : {{ selected_client.credit|floatformat:2 }} €</p>
+                        <p>Points de fidélité : {{ selected_client.fidelity_points|floatformat:2 }}</p>
+                        <p><a href="{% url 'client_history' selected_client.id %}">Historique des Achats</a></p>
+
+                        {% if panier|length > 0 %}
+                            {% if selected_client.fidelity_points > 0 %}
+                            <form method="POST" action="{% url 'pos' %}">
+                                {% csrf_token %}
+                                <button type="submit" name="apply_points" class="btn btn-primary mt-2">
+                                    Appliquer les Points
+                                </button>
+                            </form>
+                            <p>Points de fidélité disponibles : {{ selected_client.fidelity_points|floatformat:2 }}</p>
+                            {% else %}
+                            <p>Pas de points de fidélité à appliquer.</p>
+                            {% endif %}
+
+                            {% if selected_client.credit > 0 %}
+                            <form method="POST" action="{% url 'pos' %}">
+                                {% csrf_token %}
+                                <button type="button" class="btn btn-warning btn-lg" 
+                                        data-bs-toggle="modal" data-bs-target="#confirmApplyCreditModal">
+                                    Appliquer le Crédit
+                                </button>
+                            </form>
+                            {% else %}
+                            <p>Pas de crédit à appliquer.</p>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                    {% elif search_results %}
+                    <div class="alert alert-info">
+                        Plusieurs clients trouvés. Sélectionnez un client.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 2. Carte Messages d'Information -->
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h5 class="card-title">Infos</h5>
+                    {% if messages %}
+                        {% for message in messages %}
+                        <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-{{ message.tags }}{% endif %} 
+                                    alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted">Aucune information à afficher.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SECTION MODALES -->
+{% include 'divino_pos/modals/stock_modal.html' %}
+{% include 'divino_pos/modals/client_search_modal.html' %}
+{% include 'divino_pos/modals/reduction_modal.html' %}
+{% include 'divino_pos/modals/global_reduction_modal.html' %}
+{% include 'divino_pos/modals/payment_modal.html' %}
+{% include 'divino_pos/modals/confirm_credit_modal.html' %}
+{% include 'divino_pos/modals/addproduct_modal.html' %}
+{% include 'divino_pos/modals/add_client_modal.html' %}
+
+<!-- SECTION SCRIPTS -->
+{% if show_add_client_modal %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var addClientModal = new bootstrap.Modal(document.getElementById('addClientModal'));
+        addClientModal.show();
+    });
+</script>
+{% endif %}
+<script>
+    function openReductionModal(button) {
+        var codeEan = button.getAttribute('data-code-ean');
+        document.getElementById('code_ean_input').value = codeEan;
+        var reductionModal = new bootstrap.Modal(document.getElementById('reductionModal'));
+        reductionModal.show();
+    }
+
+    function openGlobalReductionModal() {
+        var globalReductionModal = new bootstrap.Modal(document.getElementById('globalReductionModal'));
+        globalReductionModal.show();
+    }
+
+    {% if show_stock_modal %}
+        var stockModal = new bootstrap.Modal(document.getElementById('stockModal'));
+        stockModal.show();
+    {% endif %}
+
+    {% if show_client_search_modal %}
+        var clientSearchModal = new bootstrap.Modal(document.getElementById('clientSearchModal'));
+        clientSearchModal.show();
+    {% endif %}
+</script>
+{% endblock %}

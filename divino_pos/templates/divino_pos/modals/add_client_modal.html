@@ -1,0 +1,108 @@
+<!-- Modale pour ajouter un client manuellement -->
+<div id="addClientModal" class="modal fade" tabindex="-1" aria-labelledby="addClientModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+           
+            <div class="modal-header">
+                <h5 class="modal-title text-primary">Ajouter un Client</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="{% url 'pos' %}">
+                    {% csrf_token %}
+                    <!-- Afficher les erreurs non liées aux champs -->
+                    {% if client_form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {{ client_form.non_field_errors }}
+                        </div>
+                    {% endif %}
+                    <div class="row">
+                        <!-- Utilisation des classes Bootstrap pour une meilleure mise en page -->
+                        <!-- Champ Nom -->
+                        <div class="col-md-6 mb-3">
+                            <label for="id_nom" class="form-label">Nom :</label>
+                            <input type="text" class="form-control" id="id_nom" name="nom" placeholder="Nom de famille">
+                            {% if client_form.nom.errors %}
+                                <div class="text-danger">
+                                    {{ client_form.nom.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <!-- Champ Prénom -->
+                        <div class="col-md-6 mb-3">
+                            <label for="id_prenom" class="form-label">Prénom :</label>
+                            <input type="text" class="form-control" id="id_prenom" name="prenom" placeholder="Prénom">
+                            {% if client_form.prenom.errors %}
+                                <div class="text-danger">
+                                    {{ client_form.prenom.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="id_date_anniversaire" class="form-label">Date d'anniversaire :</label>
+                            <input type="date" class="form-control" id="id_date_anniversaire" name="date_anniversaire">
+                        </div>
+                        <!-- Champ Email -->
+                        <div class="col-md-6 mb-3">
+                            <label for="id_email" class="form-label">Email :</label>
+                            <input type="email" class="form-control" id="id_email" name="email" placeholder="Adresse email">
+                            {% if client_form.email.errors %}
+                                <div class="text-danger">
+                                    {{ client_form.email.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="id_numero_rue" class="form-label">Numéro et rue :</label>
+                            <input type="text" class="form-control" id="id_numero_rue" name="numero_rue" placeholder="Numéro et nom de rue">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="id_code_postal" class="form-label">Code postal :</label>
+                            <input type="text" class="form-control" id="id_code_postal" name="code_postal" placeholder="Code postal">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="id_ville" class="form-label">Ville :</label>
+                            <input type="text" class="form-control" id="id_ville" name="ville" placeholder="Ville">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="id_pays" class="form-label">Pays :</label>
+                            <input type="text" class="form-control" id="id_pays" name="pays" placeholder="Pays">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="id_telephone" class="form-label">Téléphone :</label>
+                            <input type="tel" class="form-control" id="id_telephone" name="telephone" placeholder="Numéro de téléphone">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" name="add_client" class="btn btn-primary">Ajouter le Client</button>
+                        <button type="button" onclick="fetchEIDData()" class="btn btn-secondary">Lire la carte eID</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function fetchEIDData() {
+        fetch("{% url 'fetch_eid_data' %}")
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    // Remplir les champs du formulaire avec les données de la carte eID
+                    document.getElementById("id_nom").value = data.nom;
+                    document.getElementById("id_prenom").value = data.prenom;
+                    document.getElementById("id_date_anniversaire").value = data.date_naissance;
+                    document.getElementById("id_numero_rue").value = data.adresse;
+                    document.getElementById("id_ville").value = data.ville;
+                    document.getElementById("id_code_postal").value = data.code_postal;
+                    document.getElementById("id_pays").value = data.pays;
+                }
+            })
+            .catch(error => console.error("Erreur lors de la récupération des données eID:", error));
+    }
+    
+</script>
+

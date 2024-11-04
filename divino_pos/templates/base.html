@@ -1,0 +1,139 @@
+<!-- templates/base.html -->
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Divino POS</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Font Awesome pour les icônes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+    <!-- Votre propre CSS -->
+    <style>
+        body {
+            padding-top: 70px; /* Espace pour la navbar fixe */
+            background-color: #f8f9fa; /* Couleur de fond agréable */
+        }
+
+        /* Styles pour la navbar */
+        .navbar-brand h2 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .navbar {
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Style pour le "Chiffres du jour" */
+        .navbar-text {
+            color: #28a745;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        /* Styles pour les liens de navigation */
+        .nav-link {
+            font-size: 1rem;
+            margin-right: 15px;
+        }
+
+        .nav-link:hover {
+            color: #28a745;
+        }
+
+        /* Styles pour le footer (si nécessaire) */
+        footer {
+            background-color: #343a40;
+            color: #fff;
+            padding: 15px 0;
+            margin-top: 40px;
+        }
+
+        footer a {
+            color: #28a745;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+
+</head>
+<body>
+    <!-- Barre de Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+        <div class="container-fluid">
+            <!-- Brand -->
+            <a class="navbar-brand d-flex align-items-center" href="{% url 'pos' %}">
+                <i class="fas fa-store-alt me-2"></i> <!-- Icône Font Awesome -->
+                <h2>Divino POS</h2>
+            </a>
+
+            <!-- Toggler pour mobile -->
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavDropdown" 
+                aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Basculer la navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <!-- Contenu de la navbar -->
+            <div class="collapse navbar-collapse" id="navbarNavDropdown">
+                <!-- Liens de navigation -->
+                <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'sales_history' %}">Historique des Ventes</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'client_list' %}">Clients</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'list_products' %}">Produits</a>
+                    </li>
+                    
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'sales_report' %}">Rapports</a>
+                    </li>
+                
+                <!-- Chiffres du jour -->
+                <span class="navbar-text ms-lg-3 mt-2 mt-lg-0">
+                    <i class="fas fa-chart-line me-1"></i>
+                    Chiffres du jour : {{ total_sales_today|floatformat:2 }} €
+                </span>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'import_products' %}">Importer Produits</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'import_clients' %}">Importer Clients</a>
+                </li>
+            </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Contenu Principal -->
+    <main>
+        {% block content %}
+        <!-- Le contenu des pages spécifiques sera injecté ici -->
+        {% endblock %}
+    </main>
+
+    <!-- Footer (optionnel) -->
+    <!--
+    <footer class="text-center">
+        <div class="container">
+            <p>&copy; 2024 Divino POS. Tous droits réservés.</p>
+        </div>
+    </footer>
+    -->
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ticket de Caisse</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            max-width: 320px;
+            margin: 0 auto;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+        }
+        .header, .footer {
+            text-align: center;
+        }
+        .header img {
+            width: 80px;
+            height: auto;
+        }
+        .shop-name {
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .shop-info {
+            font-size: 12px;
+        }
+        .transaction-details {
+            margin: 20px 0;
+            text-align: left;
+        }
+        .transaction-details th, .transaction-details td {
+            padding: 5px 0;
+        }
+        .totals {
+            margin-top: 20px;
+            text-align: left;
+        }
+        .totals th, .totals td {
+            padding: 5px 0;
+            font-weight: bold;
+        }
+        .footer {
+            font-size: 10px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- En-tête du ticket avec logo et infos boutique -->
+    <div class="header">
+        <img src="https://divinofashionwebphoto.s3.eu-west-3.amazonaws.com/logo+app+face.png" alt="Logo de la boutique">
+        
+        <p class="shop-info">
+            10 petite rue<br>
+            7700, Mouscron<br>
+            Tél: +32 56 33 06 85
+        </p>
+    </div>
+
+    <!-- Détails de la transaction -->
+    <div class="transaction-details">
+        <table width="100%">
+            <tr>
+                <th>Date :</th>
+                <td>{{ transaction_date }}</td>
+            </tr>
+            <tr>
+                <th>Client :</th>
+                <td>{{ client_firstname }} {{ client_lastname }}</td> <!-- Afficher prénom et nom -->
+            </tr>
+            <tr>
+                <th>Mode de paiement :</th>
+                <td>{{ mode_paiement }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Détails des articles -->
+    <div class="transaction-items">
+        <table width="100%">
+            <thead>
+                <tr>
+                    <th>Article</th>
+                    <th>Qté</th>
+                    <th>Prix</th>
+                    <th>Promo</th> <!-- Nouvelle colonne pour la réduction -->
+                    <th>Total</th> <!-- Ajout pour le total par article -->
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in transaction_items %}
+                <tr>
+                    <td>{{ item.item.product.nom_article }}</td> <!-- Nom du produit via la ForeignKey product -->
+                    <td>{{ item.item.quantity }}</td> <!-- Quantité achetée -->
+                    <td>{{ item.item.price|floatformat:2 }} €</td> <!-- Prix sans réduction -->
+                    <td>{{ item.item.reduction|floatformat:2 }} €</td> <!-- Montant de la réduction -->
+                    <td>{{ item.total|floatformat:2 }} €</td> <!-- Total par article après réduction -->
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Totaux -->
+    <div class="ticket-section">
+        <h3>Détails de la Transaction</h3>
+        
+        {% if transaction.total_price|add:transaction.total_reduction > 0 %}
+            <p><strong>Total : </strong>{{ transaction.total_price|add:transaction.total_reduction }} €</p>
+        {% endif %}
+        
+        {% if transaction.total_reduction > 0 %}
+            <p><strong>Total des Réductions : </strong>{{ transaction.total_reduction }} €</p>
+        {% endif %}
+        
+        {% if transaction.points_applied > 0 %}
+            <p><strong>Points Appliqués : </strong>{{ transaction.points_applied }} €</p>
+        {% endif %}
+        
+        {% if transaction.credit_applied > 0 %}
+            <p><strong>Crédit Appliqué : </strong>{{ transaction.credit_applied }} €</p>
+        {% endif %}
+        
+        {% if transaction.points_gagnes > 0 %}
+            <p><strong>Points de Fidélité Gagnés : </strong>{{ transaction.points_gagnes }} points</p>
+        {% endif %}
+        
+        <h3><p><strong>Total à payer : </strong>{{ transaction.total_price }} €</p></h3>
+    </div>
+    
+    <!-- Pied de page avec message et remerciements -->
+    <div class="footer">
+        <p>Echange dans les 8 jours, avec ticket de caisse et label. Echange en bon d'achat, valable 6 mois. 
+            Pas de remboursement en espèces.
+            Pas de reprise ,ni échanges ,sur les articles en promotion.</p>
+        <p>Merci pour votre achat ! : <td>{{ client_firstname }}</td></p>
+        <p>À bientôt dans notre boutique.</p>
+    </div>
+
+    <!-- Script pour imprimer automatiquement le ticket et revenir sur la page correcte -->
+<script type="text/javascript">
+    window.onload = function() {
+        window.print(); // Déclenche l'impression automatique
+
+        // Redirige vers la bonne page après impression ou annulation
+        window.onafterprint = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const source = urlParams.get('source');
+
+            if (window.opener) {
+                // Si la fenêtre est ouverte dans un nouvel onglet ou popup, on la ferme
+                window.close();
+            } else {
+                // Sinon, on redirige vers la page source (POS ou Historique des Ventes)
+                if (source === 'pos') {
+                    // Rediriger vers la page POS si l'impression vient du POS
+                    window.location.href = "{% url 'pos' %}";
+                } else if (source === 'sales_history') {
+                    // Rediriger vers l'historique des ventes si l'impression vient de là
+                    window.location.href = "{% url 'sales_history' %}";
+                } else {
+                    // Par défaut, on retourne au POS si aucune source n'est spécifiée
+                    window.location.href = "{% url 'pos' %}";
+                }
+            }
+        };
+    };
+</script>
+
+</body>
+</html>

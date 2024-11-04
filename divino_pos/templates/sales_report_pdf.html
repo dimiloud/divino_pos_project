@@ -1,0 +1,32 @@
+<html>
+<head>
+    <style>
+        var salesChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: {{ sales_dates|safe }},
+        datasets: [{
+            label: 'Ventes (€)',
+            data: {{ sales_amounts|safe }},
+            backgroundColor: '{{ line_chart_background_color|default:"rgba(54, 162, 235, 0.2)" }}',
+            borderColor: '{{ line_chart_border_color|default:"rgba(54, 162, 235, 1)" }}',
+            borderWidth: 2
+        }]
+    },
+    options: {
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+    </style>
+</head>
+<body>
+    <h1>Rapport des ventes</h1>
+    <p>Période : {{ start_date }} - {{ end_date }}</p>
+    <p>Total des ventes : {{ total_sales }} €</p>
+    <!-- Vous pouvez ajouter plus de détails ici -->
+</body>
+</html>

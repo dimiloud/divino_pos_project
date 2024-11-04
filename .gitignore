@@ -1,0 +1,20 @@
+# Python
+*.pyc
+__pycache__/
+
+# Environnements virtuels
+venv/
+
+# Fichiers de configuration sensibles
+*.env
+secrets.json
+
+# Base de données
+db.sqlite3
+
+# Fichiers statiques et médias
+/static/
+/media/
+
+# Logs
+*.log

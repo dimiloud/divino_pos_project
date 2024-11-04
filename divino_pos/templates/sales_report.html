@@ -1,0 +1,194 @@
+<!-- @ts-nocheck -->
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4">Rapport des ventes</h1>
+
+    <!-- Formulaire pour la sélection de la période -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <form method="GET" action="{% url 'sales_report' %}">
+                <div class="form-group row">
+                    <label for="start_date" class="col-sm-3 col-form-label">Date de début :</label>
+                    <div class="col-sm-9">
+                        <input type="date" id="start_date" name="start_date" class="form-control" value="{{ start_date }}">
+                    </div>
+                </div>
+                <div class="form-group row mt-3">
+                    <label for="end_date" class="col-sm-3 col-form-label">Date de fin :</label>
+                    <div class="col-sm-9">
+                        <input type="date" id="end_date" name="end_date" class="form-control" value="{{ end_date }}">
+                    </div>
+                </div>
+                <div class="form-group row mt-3">
+                    <div class="col-sm-12 text-end">
+                        <button type="submit" class="btn btn-primary">Générer le rapport</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Section des Statistiques Générales -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <h2>Statistiques Générales</h2>
+            <ul class="list-group">
+                <li class="list-group-item">Total des ventes : {{ total_sales|floatformat:2 }} €</li>
+                <li class="list-group-item">Total des réductions : {{ total_discounts|floatformat:2 }} €</li>
+                <li class="list-group-item">Nombre total de transactions : {{ total_transactions }}</li>
+                <li class="list-group-item">Moyenne des ventes par jour : {{ avg_sales_per_day|floatformat:2 }} €</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Section de la Répartition par Mode de Paiement -->
+    <div class="row mt-5">
+        <div class="col-md-6">
+            <h3>Répartition par Mode de Paiement</h3>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Mode de paiement</th>
+                        <th>Total des ventes (€)</th>
+                        <th>Nombre de transactions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payment in payment_distribution %}
+                    <tr>
+                        <td>{{ payment.mode_paiement|capfirst }}</td>
+                        <td>{{ payment.total_sales|floatformat:2 }}</td>
+                        <td>{{ payment.total_transactions }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="col-md-6">
+            <h3>Graphique des Ventes par Mode de Paiement</h3>
+            <canvas id="paymentChart" width="400" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- Section Top 10 des Produits et Ventes par Catégorie -->
+    <div class="row mt-5">
+        <div class="col-md-6">
+            <h3>Top 10 des Produits Vendus</h3>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Produit</th>
+                        <th>Quantité</th>
+                        <th>Total des Ventes (€)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in top_products %}
+                    <tr>
+                        <td>{{ product.product__nom_article }}</td>
+                        <td>{{ product.total_quantity }}</td>
+                        <td>{{ product.total_sales|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="col-md-6">
+            <h3>Ventes par Catégorie</h3>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Catégorie</th>
+                        <th>Total des Ventes (€)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for category in sales_by_category %}
+                    <tr>
+                        <td>{{ category.product__categorie }}</td>
+                        <td>{{ category.total_sales|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Section des graphiques -->
+    <div class="row mt-5">
+        <div class="col-md-12">
+            <h3>Graphique des Ventes par Jour</h3>
+            <canvas id="salesChart" width="400" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- Bouton pour télécharger le rapport PDF -->
+    <div class="row mt-4">
+        <div class="col-md-12 text-end">
+            <a href="{% url 'sales_report_pdf' %}?start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-secondary">
+                Télécharger le rapport PDF
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Script pour Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    var ctx = document.getElementById('salesChart').getContext('2d');
+    var salesChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ sales_dates|safe }},
+            datasets: [{
+                label: 'Ventes (€)',
+                data: {{ sales_amounts|safe }},
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Graphique pour la répartition des ventes par mode de paiement
+    var paymentCtx = document.getElementById('paymentChart').getContext('2d');
+    var paymentData = {
+        labels: [
+            {% for payment in payment_distribution %}
+                '{{ payment.mode_paiement|capfirst }}',
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Répartition des Ventes (€)',
+            data: [
+                {% for payment in payment_distribution %}
+                    {{ payment.total_sales }},
+                {% endfor %}
+            ],
+            backgroundColor: ['#007bff', '#28a745'],
+            borderColor: '#ffffff',
+            borderWidth: 1
+        }]
+    };
+
+    var paymentChart = new Chart(paymentCtx, {
+        type: 'pie',
+        data: paymentData,
+        options: {
+            responsive: true
+        }
+    });
+</script>
+
+{% endblock %}

@@ -1,0 +1,31 @@
+<!-- stock_modal.html -->
+<div class="modal fade" id="stockModal" tabindex="-1" aria-labelledby="stockModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-center w-100" id="stockModalLabel" style="color: red; font-weight: bold;">
+                    <i class="fas fa-exclamation-triangle"></i> Stock Insuffisant
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {% if product_insufficient_stock %}
+                <p>Le stock est insuffisant pour le produit <strong>{{ product_insufficient_stock.nom_article }}</strong>.</p>
+                <form method="POST" action="{% url 'pos' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="product_id" value="{{ product_insufficient_stock.id }}">
+                    <div class="mb-3">
+                        <label for="new_stock" class="form-label">Nouvelle quantité :</label>
+                        <input type="number" id="new_stock" name="new_stock" class="form-control" required>
+                    </div>
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-primary" name="correct_stock">Corriger le stock</button>
+                    </div>
+                </form>
+                {% else %}
+                <p>Aucun produit sélectionné pour la correction du stock.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

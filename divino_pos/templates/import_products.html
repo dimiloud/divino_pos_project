@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1>Importer des Produits</h1>
+    <hr>
+    <p>Utilisez le formulaire ci-dessous pour importer des produits à partir d'un fichier Excel.</p>
+
+    {% if messages %}
+    <div class="alert alert-success" role="alert">
+        {% for message in messages %}
+            {{ message }}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <form action="{% url 'import_products' %}" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="file" class="form-label">Sélectionnez le fichier Excel</label>
+            <input type="file" class="form-control" id="file" name="file" accept=".xlsx, .xls">
+        </div>
+        <button type="submit" class="btn btn-primary">Importer</button>
+    </form>
+
+    <hr>
+    <p>Assurez-vous que le fichier contient les colonnes suivantes :</p>
+    <ul>
+        <li><strong>code_ean</strong> : Code-barres EAN (13 caractères)</li>
+        <li><strong>code_article</strong> : Code de l'article</li>
+        <li><strong>nom_article</strong> : Nom du produit</li>
+        <li><strong>prix_achat</strong> : Prix d'achat</li>
+        <li><strong>prix_vente</strong> : Prix de vente</li>
+        <li><strong>categorie</strong> : Catégorie du produit</li>
+        <li><strong>couleurs</strong> : Couleur(s)</li>
+        <li><strong>tailles</strong> : Taille(s)</li>
+        <li><strong>quantite</strong> : Quantité disponible</li>
+    </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,114 @@
+<!-- templates/sales_history.html -->
+
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    table {
+        border-collapse: separate; /* Nécessaire pour que border-radius fonctionne */
+        border-spacing: 0;
+        width: 100%;
+        border: 1px solid #ddd;
+        border-radius: 10px; /* Ajustez la valeur pour changer le rayon des coins */
+        overflow: hidden; /* Pour que le contenu respecte les coins arrondis */
+    }
+    
+    thead th {
+        background-color: #f2f2f2;
+        color: #333;
+        padding: 12px;
+        text-align: left;
+    }
+    
+    tbody td {
+        padding: 12px;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    tbody tr:last-child td {
+        border-bottom: none; /* Retire la bordure de la dernière ligne */
+    }
+    </style>
+<div class="container mt-4">
+    <h2 class="mb-4 text-center">Historique des Ventes</h2>
+
+    <!-- Formulaire pour filtrer par date -->
+    <form method="get" action="{% url 'sales_history' %}" class="row g-3 mb-4">
+        <div class="col-md-2">
+            <label for="start_date" class="form-label">Date de début</label>
+            <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date|date:'Y-m-d' }}">
+        </div>
+        <div class="col-md-2">
+            <label for="end_date" class="form-label">Date de fin</label>
+            <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date|date:'Y-m-d' }}">
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary">Filtrer</button>
+        </div>
+    </form>
+
+    <!-- Table des ventes -->
+    <div class="table-responsive">
+        <div class="card-header">
+            <h5>Ventes du {% if start_date == today and end_date == today %} aujourd'hui {% else %} {{ start_date|date:'d/m/Y' }} au {{ end_date|date:'d/m/Y' }} {% endif %}</h5>
+        </div>
+        <div class="card-body">
+            {% if transactions_with_items %}
+                <table class="table table-striped">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Date</th>
+                            <th>Client</th>
+                            <th>Total</th>
+                            <th>Points Appliqués</th>
+                            <th>Réduction</th>
+                            <th>Mode de Paiement</th>
+                            <th>Points Gagnés</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transaction in transactions_with_items %}
+                        <tr>
+                            <td>{{ transaction.id }}</td>
+                        </td>                        
+                        <td>{{ transaction.date|date:'d/m/Y H:i' }}</td>
+                            <td>
+                                {% if transaction.client %}
+                                    {{ transaction.client.nom }} {{ transaction.client.prenom }}
+                                {% else %}
+                                    Anonyme
+                                {% endif %}
+                            </td>
+                            <td>{{ transaction.total_price }} €</td>
+                            <td>{{ transaction.points_applied }} €</td>
+                            <td>{{ transaction.total_reduction }} €</td>
+                            <td>
+                                {% if transaction.mode_paiement == 'cash' %}
+                                    <span class="badge bg-secondary text-white">Cash</span>
+                                {% elif transaction.mode_paiement == 'carte' %}
+                                    <span class="badge bg-primary text-white">Carte</span>
+                                {% else %}
+                                    {{ transaction.mode_paiement|capfirst }}
+                                {% endif %}
+                            </td>                        
+                            <td>{{ transaction.points_gagnes }} points</td>
+                            <td>
+                                <a href="{% url 'transaction_detail' transaction.id %}" class="btn btn-sm btn-info">Détails</a>
+                                <a href="{% url 'generate_ticket' transaction.id %}?source=sales_history" class="btn btn-sm btn-success">Imprimer Ticket</a>
+                                <a href="{% url 'manage_return' transaction.id %}" class="btn btn-sm btn-danger">Gérer les Retours</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>Aucune transaction trouvée pour cette période.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+
+{% endblock %}

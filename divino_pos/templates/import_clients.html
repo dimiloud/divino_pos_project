@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1>Importer des Clients</h1>
+    <hr>
+    <p>Utilisez le formulaire ci-dessous pour importer des clients à partir d'un fichier Excel.</p>
+
+    {% if messages %}
+    <div class="alert alert-success" role="alert">
+        {% for message in messages %}
+            {{ message }}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <form action="{% url 'import_clients' %}" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="file" class="form-label">Sélectionnez le fichier Excel</label>
+            <input type="file" class="form-control" id="file" name="file" accept=".xlsx, .xls">
+        </div>
+        <button type="submit" class="btn btn-primary">Importer</button>
+    </form>
+
+    <hr>
+    <p>Assurez-vous que le fichier contient les colonnes suivantes :</p>
+    <ul>
+        <li><strong>n_carte</strong> : Numéro de la carte client</li>
+        <li><strong>nom</strong> : Nom du client</li>
+        <li><strong>prenom</strong> : Prénom du client</li>
+        <li><strong>date_anniversaire</strong> : Date d'anniversaire du client</li>
+        <li><strong>email</strong> : Adresse email du client</li>
+        <li><strong>numero_rue</strong> : Numéro et nom de rue</li>
+        <li><strong>code_postal</strong> : Code postal</li>
+        <li><strong>ville</strong> : Ville</li>
+        <li><strong>pays</strong> : Pays</li>
+        <li><strong>telephone</strong> : Numéro de téléphone</li>
+    </ul>
+</div>
+{% endblock %}

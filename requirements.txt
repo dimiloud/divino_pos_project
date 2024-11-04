@@ -1,0 +1,5 @@
+Django==5.1.1
+gunicorn
+psycopg2-binary
+django-crispy-forms
+# Ajoutez toutes les autres dépendances que vous utilisez
