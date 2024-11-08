@@ -52,5 +52,5 @@ urlpatterns = [
     path('ticket/<int:transaction_id>/', views.generate_ticket_de_caisse, name='generate_ticket'),
 
     # fonction de lecteur eid
-    path('fetch_eid_data/', views.fetch_eid_data, name='fetch_eid_data'),
+    path('read_eid/', views.read_eid, name='read_eid'),
 ]

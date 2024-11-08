@@ -57,6 +57,7 @@ class GlobalDiscountForm(forms.Form):
     )
 
 class ProductForm(forms.ModelForm):
+    # Champ personnalisé déjà existant
     quantite_panier = forms.IntegerField(
         initial=1,
         min_value=1,
@@ -67,13 +68,22 @@ class ProductForm(forms.ModelForm):
 
     class Meta:
         model = Product
-        fields = ['nom_article', 'code_ean', 'prix_vente', 'quantite']  # Stock initial du produit
+        fields = ['code_ean', 'code_article', 'nom_article', 'tailles', 'prix_vente', 'quantite']
         widgets = {
+            'code_ean': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Code EAN (laisser vide pour générer automatiquement)'
+            }),
+            'code_article': forms.TextInput(attrs={'class': 'form-control'}),
             'nom_article': forms.TextInput(attrs={'class': 'form-control', 'required': True}),
-            'code_ean': forms.TextInput(attrs={'class': 'form-control'}),
+            'tailles': forms.TextInput(attrs={'class': 'form-control', 'required': True}),
             'prix_vente': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'required': True}),
             'quantite': forms.NumberInput(attrs={'class': 'form-control', 'required': True, 'min': '1'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super(ProductForm, self).__init__(*args, **kwargs)
+        self.fields['code_ean'].required = False  # Rendre le champ optionnel
 
 class ClientCreationForm(forms.ModelForm):
     class Meta:
@@ -83,9 +93,15 @@ class ClientCreationForm(forms.ModelForm):
             'date_anniversaire': forms.DateInput(attrs={'type': 'date'}),
         }
 
-def clean_email(self):
+    def clean_email(self):
         email = self.cleaned_data.get('email')
         if email:
             if Client.objects.filter(email=email).exists():
                 raise forms.ValidationError("Un client avec cet email existe déjà.")
-        return email     
+        return email
+    def clean_n_carte(self):
+        n_carte = self.cleaned_data.get('n_carte')
+        if n_carte:
+            if Client.objects.filter(n_carte=n_carte).exists():
+                raise forms.ValidationError("Un client avec ce numéro de carte existe déjà.")
+        return n_carte

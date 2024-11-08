@@ -2,14 +2,15 @@ from decimal import Decimal
 from django.db.models import Sum
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
-from django.db import models
+from django.db import models, IntegrityError
 from django.db.models.signals import pre_save, post_delete
 from django.dispatch import receiver
 from django.utils import timezone
 import uuid
+import random
 
 class Product(models.Model):
-    code_ean = models.CharField(max_length=100, unique=True)
+    code_ean = models.CharField(max_length=13, unique=True, blank=True, null=True)
     code_article = models.CharField(max_length=100, unique=False, null=True, blank=True)
     nom_article = models.CharField(max_length=255)
     prix_vente = models.DecimalField(max_digits=10, decimal_places=2)
@@ -37,14 +38,33 @@ class Product(models.Model):
     
     def save(self, *args, **kwargs):
         if not self.code_article:
-            # Générer une valeur unique pour code_article
             self.code_article = str(uuid.uuid4())
+        if not self.code_ean:
+            self.code_ean = self.generate_unique_ean()
         super(Product, self).save(*args, **kwargs)
 
+    def generate_unique_ean(self):
+        for _ in range(100):  # Limite le nombre de tentatives à 100
+            ean = ''.join([str(random.randint(0, 9)) for _ in range(12)])
+            ean_with_checksum = self.calculate_ean13_checksum(ean)
+            if not Product.objects.filter(code_ean=ean_with_checksum).exists():
+                return ean_with_checksum
+        raise IntegrityError('Impossible de générer un code EAN unique.')
+    
+    def calculate_ean13_checksum(self, ean):
+        total = 0
+        for i, digit in enumerate(ean):
+            n = int(digit)
+            if i % 2 == 0:
+                total += n
+            else:
+                total += n * 3
+        checksum = (10 - (total % 10)) % 10
+        return ean + str(checksum)
+    
     class Meta:
         verbose_name = "Produit"
         verbose_name_plural = "Produits"
-
 
 class Client(models.Model):
     n_carte = models.CharField(
@@ -84,6 +104,8 @@ class Client(models.Model):
         validators=[MinValueValidator(Decimal('0.00'))],
         help_text="Points de fidélité accumulés par le client."
     )
+    n_carte = models.CharField(max_length=50, blank=True, null=True, unique=True)  # Ajouté
+
     def __str__(self):
         return f"{self.prenom} {self.nom}"
 

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from django.contrib import messages
 from .forms import DiscountForm, StockUpdateForm, ProductForm, ClientCreationForm
 from django.utils.timezone import make_aware
+from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
@@ -13,6 +14,7 @@ from django.db.models import Q, Sum, Count, Max
 from django.http import HttpResponseRedirect, HttpResponse, Http404, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.template.loader import get_template
+from django.middleware.csrf import get_token
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.urls import reverse
@@ -20,6 +22,7 @@ from django.views.decorators.http import require_POST
 from xhtml2pdf import pisa
 import pandas as pd
 import requests
+import json
 from .forms import ReturnForm
 from .models import (
     Client, Product, Transaction, TransactionItem, Return, Voucher
@@ -1483,16 +1486,18 @@ def add_product(request):
             product.prix_achat = Decimal('0.00')  # Vous pouvez changer la valeur par défaut si nécessaire
             product.save()
 
+            # Quantité à ajouter au panier
+            quantite_panier = form.cleaned_data.get('quantite_panier', 1)
 
-            # Optionnel : Ajouter le produit directement au panier
+            # Ajouter le produit au panier
             panier = request.session.get('panier', {})
-            code_ean = product.code_ean if product.code_ean else str(product.id)
+            code_ean = product.code_ean
             if code_ean in panier:
-                panier[code_ean]['quantite'] += product.quantite
+                panier[code_ean]['quantite'] += quantite_panier
             else:
                 panier[code_ean] = {
                     'nom': product.nom_article,
-                    'quantite': product.quantite,
+                    'quantite': quantite_panier,
                     'prix_vente': str(product.prix_vente),
                     'prix_original': str(product.prix_vente),
                 }
@@ -1539,11 +1544,46 @@ def add_product(request):
     else:
         return redirect('pos')
 
-def fetch_eid_data(request):
-    try:
-        # Remplacez l'URL par votre URL ngrok
-        response = requests.get("https://1c18-2a02-a03f-e601-3101-8919-5d74-c915-7b16.ngrok-free.app/read_eid")
-        data = response.json()
-        return JsonResponse(data)
-    except requests.exceptions.RequestException as e:
-        return JsonResponse({"error": "Erreur lors de la récupération des données eID", "details": str(e)})
+@login_required
+@csrf_protect
+def read_eid(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            # Traiter les données reçues
+            nom = data.get('nom', '').strip()
+            prenom = data.get('prenom', '').strip()
+            date_naissance = data.get('date_naissance', '').strip()
+            adresse = data.get('adresse', '').strip()
+            code_postal = data.get('code_postal', '').strip()
+            ville = data.get('ville', '').strip()
+            pays = data.get('pays', 'Belgique').strip()
+            n_carte = data.get('n_carte', '').strip()
+
+            # Validation des données
+            required_fields = ['nom', 'prenom', 'date_naissance', 'adresse', 'code_postal', 'ville', 'n_carte']
+            for field in required_fields:
+                if not data.get(field):
+                    return JsonResponse({'success': False, 'error': f"Le champ {field} est requis."})
+
+            # Vérifier l'unicité du numéro de carte eID
+            if Client.objects.filter(n_carte=n_carte).exists():
+                return JsonResponse({'success': False, 'error': "Un client avec ce numéro de carte existe déjà."})
+
+            # Préparer la réponse
+            response = {
+                'success': True,
+                'nom': nom,
+                'prenom': prenom,
+                'date_naissance': date_naissance,
+                'adresse': adresse,
+                'code_postal': code_postal,
+                'ville': ville,
+                'pays': pays,
+                'n_carte': n_carte,
+            }
+            return JsonResponse(response)
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'error': 'Données invalides.'})
+    else:
+        return JsonResponse({'success': False, 'error': 'Méthode non autorisée.'})

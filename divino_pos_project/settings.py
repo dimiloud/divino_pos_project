@@ -29,11 +29,23 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-xywd1ne_rt7v7n55r@ihi1@nzl63!&-z6#vn6odd60z@45#yku'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
-ALLOWED_HOSTS = ['37.187.115.225']
-
-
+ALLOWED_HOSTS = [
+    'monpos.duckdns.org',
+    'www.monpos.duckdns.org',
+    'monposdev.duckdns.org',
+    '127.0.0.1',
+    'localhost',
+]
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
+SECURE_SSL_REDIRECT = True
+SECURE_HSTS_SECONDS = 31536000  # 1 an
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
 # Application definition
 
 INSTALLED_APPS = [
@@ -43,7 +55,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'divino_pos',  # Ajoute cette ligne pour ton application POS
+    'divino_pos',
+    'django_extensions',  # Ajoute cette ligne pour ton application POS
 ]
 
 
@@ -127,7 +140,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Chemin local pour stocker vos fichiers statiques pendant le développement
+STATICFILES_DIRS = [
+    BASE_DIR / "static",  # Ce chemin est correct vu votre structure
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -135,3 +153,10 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000  # Augmente cette valeur selon tes besoins
+
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+CORS_ALLOW_ALL_ORIGINS = True
+
+
