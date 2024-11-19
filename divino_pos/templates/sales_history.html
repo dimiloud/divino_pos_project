@@ -29,7 +29,7 @@
         border-bottom: none; /* Retire la bordure de la dernière ligne */
     }
     </style>
-<div class="container mt-4">
+<div class="container-fluid">
     <h2 class="mb-4 text-center">Historique des Ventes</h2>
 
     <!-- Formulaire pour filtrer par date -->
@@ -57,7 +57,7 @@
                 <table class="table table-striped">
                     <thead class="table-dark">
                         <tr>
-                            <th>ID</th>
+                            <th>UUID</th>
                             <th>Date</th>
                             <th>Client</th>
                             <th>Total</th>
@@ -71,7 +71,7 @@
                     <tbody>
                         {% for transaction in transactions_with_items %}
                         <tr>
-                            <td>{{ transaction.id }}</td>
+                            <td class="small">{{ transaction.pk }}</td>
                         </td>                        
                         <td>{{ transaction.date|date:'d/m/Y H:i' }}</td>
                             <td>
@@ -95,9 +95,9 @@
                             </td>                        
                             <td>{{ transaction.points_gagnes }} points</td>
                             <td>
-                                <a href="{% url 'transaction_detail' transaction.id %}" class="btn btn-sm btn-info">Détails</a>
-                                <a href="{% url 'generate_ticket' transaction.id %}?source=sales_history" class="btn btn-sm btn-success">Imprimer Ticket</a>
-                                <a href="{% url 'manage_return' transaction.id %}" class="btn btn-sm btn-danger">Gérer les Retours</a>
+                                <a href="{% url 'transaction_detail' transaction_pk=transaction.pk %}" class="btn btn-sm btn-info">Détails</a>
+                                <a href="{% url 'generate_ticket' transaction_pk=transaction.pk %}?source=sales_history" class="btn btn-sm btn-success">Imprimer Ticket</a>
+                                <a href="{% url 'manage_return' transaction_pk=transaction.pk %}" class="btn btn-sm btn-danger">Gérer les Retours</a>
                             </td>
                         </tr>
                         {% endfor %}

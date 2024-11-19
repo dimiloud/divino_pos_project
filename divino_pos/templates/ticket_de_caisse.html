@@ -47,6 +47,18 @@
             font-size: 10px;
             margin-top: 20px;
         }
+        /* Empêche l'espace blanc inutile après le contenu */
+    @media print {
+        body {
+            margin: 0;
+            padding: 0;
+            page-break-after: avoid; /* Évite les coupures de page inutiles */
+        }
+
+        .footer {
+            page-break-after: always; /* Fin de page après le contenu du ticket */
+        }
+    }
     </style>
 </head>
 <body>

@@ -1,23 +1,269 @@
-<!-- reduction_modal.html -->
+<!-- Modal de réduction par article -->
 <div class="modal fade" id="reductionModal" tabindex="-1" aria-labelledby="reductionModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
+            <!-- En-tête du modal -->
             <div class="modal-header">
-                <h5 class="modal-title">Appliquer une réduction</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title" id="reductionModalLabel">
+                    <i class="fas fa-percent me-2"></i>Appliquer une réduction
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
             </div>
+
+            <!-- Corps du modal -->
             <div class="modal-body">
-                <form method="POST" action="{% url 'apply_discount' %}">
+                <form id="reductionForm" method="POST" action="{% url 'apply_discount' %}">
                     {% csrf_token %}
-                    <input type="hidden" id="code_ean_input" name="code_ean" value="">
-                    <div class="mb-3">
-                        <label for="discount_percentage" class="form-label">Pourcentage de réduction (%)</label>
-                        <input type="number" class="form-control" id="discount_percentage" 
-                               name="discount_percentage" min="0" max="100" required>
+                    <input type="hidden" id="code_ean_input" name="code_ean">
+                    
+                    <!-- Informations sur l'article -->
+                    <div class="card bg-light mb-4">
+                        <div class="card-body">
+                            <h6 class="card-title">Article sélectionné</h6>
+                            <div id="selectedItemInfo">
+                                <p class="mb-1">Nom: <span id="itemName">-</span></p>
+                                <p class="mb-1">Prix original: <span id="itemOriginalPrice">-</span></p>
+                                <p class="mb-0">Quantité: <span id="itemQuantity">-</span></p>
+                            </div>
+                        </div>
                     </div>
-                    <button type="submit" class="btn btn-primary">Appliquer la réduction</button>
+
+                    <!-- Sélection du type de réduction -->
+                    <div class="mb-4">
+                        <label class="form-label">Type de réduction</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="reduction_type" id="reduction_percent" value="percent" checked>
+                            <label class="btn btn-outline-primary" for="reduction_percent">
+                                <i class="fas fa-percent me-2"></i>Pourcentage
+                            </label>
+
+                            <input type="radio" class="btn-check" name="reduction_type" id="reduction_amount" value="amount">
+                            <label class="btn btn-outline-primary" for="reduction_amount">
+                                <i class="fas fa-euro-sign me-2"></i>Montant
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Champ de saisie pour le pourcentage -->
+                    <div id="percentageInput" class="mb-4">
+                        <label for="discount_percentage" class="form-label">Pourcentage de réduction</label>
+                        <div class="input-group">
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="discount_percentage" 
+                                   name="discount_percentage" 
+                                   min="0" 
+                                   max="100" 
+                                   step="0.01" 
+                                   required>
+                            <span class="input-group-text">%</span>
+                        </div>
+                        <div class="form-text">
+                            Entrez un pourcentage entre 0 et 100
+                        </div>
+                    </div>
+
+                    <!-- Champ de saisie pour le montant -->
+                    <div id="amountInput" class="mb-4 d-none">
+                        <label for="discount_amount" class="form-label">Montant de la réduction</label>
+                        <div class="input-group">
+                            <span class="input-group-text">€</span>
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="discount_amount" 
+                                   name="discount_amount" 
+                                   min="0" 
+                                   step="0.01">
+                        </div>
+                        <div class="form-text">
+                            Entrez le montant de la réduction
+                        </div>
+                    </div>
+
+                    <!-- Aperçu de la réduction -->
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title">Aperçu de la réduction</h6>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Prix original unitaire</span>
+                                <span id="previewOriginalPrice">0.00 €</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Réduction unitaire</span>
+                                <span class="text-danger" id="previewDiscount">-0.00 €</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Nouveau prix unitaire</span>
+                                <span class="text-success" id="previewNewPrice">0.00 €</span>
+                            </div>
+                            <hr>
+                            <div class="d-flex justify-content-between">
+                                <strong>Total pour {{ item.quantite }} article(s)</strong>
+                                <strong id="previewTotal">0.00 €</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Message d'erreur -->
+                    <div id="reductionError" class="alert alert-danger mt-3 d-none"></div>
                 </form>
+            </div>
+
+            <!-- Pied du modal -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Annuler
+                </button>
+                <button type="submit" form="reductionForm" class="btn btn-primary">
+                    <i class="fas fa-check me-2"></i>Appliquer la réduction
+                </button>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('reductionForm');
+    const percentageInput = document.getElementById('discount_percentage');
+    const amountInput = document.getElementById('discount_amount');
+    const errorDiv = document.getElementById('reductionError');
+    const percentageDiv = document.getElementById('percentageInput');
+    const amountDiv = document.getElementById('amountInput');
+
+    let selectedItem = null;
+
+    // Fonction pour mettre à jour l'affichage du type de réduction
+    function updateReductionType() {
+        const reductionType = document.querySelector('input[name="reduction_type"]:checked').value;
+        if (reductionType === 'percent') {
+            percentageDiv.classList.remove('d-none');
+            amountDiv.classList.add('d-none');
+            percentageInput.required = true;
+            amountInput.required = false;
+        } else {
+            percentageDiv.classList.add('d-none');
+            amountDiv.classList.remove('d-none');
+            percentageInput.required = false;
+            amountInput.required = true;
+        }
+        updatePreview();
+    }
+
+    // Fonction pour mettre à jour l'aperçu
+    function updatePreview() {
+        if (!selectedItem) return;
+
+        const originalPrice = parseFloat(selectedItem.prix_original);
+        const quantity = parseInt(selectedItem.quantite);
+        let reduction = 0;
+        let newPrice = originalPrice;
+
+        const reductionType = document.querySelector('input[name="reduction_type"]:checked').value;
+        if (reductionType === 'percent') {
+            const percentage = parseFloat(percentageInput.value) || 0;
+            if (percentage < 0 || percentage > 100) {
+                showError('Le pourcentage doit être compris entre 0 et 100');
+                return;
+            }
+            reduction = originalPrice * (percentage / 100);
+        } else {
+            reduction = parseFloat(amountInput.value) || 0;
+            if (reduction < 0 || reduction > originalPrice) {
+                showError('La réduction ne peut pas dépasser le prix original');
+                return;
+            }
+        }
+
+        newPrice = originalPrice - reduction;
+        const total = newPrice * quantity;
+
+        // Mise à jour de l'aperçu
+        document.getElementById('previewOriginalPrice').textContent = `${originalPrice.toFixed(2)} €`;
+        document.getElementById('previewDiscount').textContent = `-${reduction.toFixed(2)} €`;
+        document.getElementById('previewNewPrice').textContent = `${newPrice.toFixed(2)} €`;
+        document.getElementById('previewTotal').textContent = `${total.toFixed(2)} €`;
+
+        hideError();
+    }
+
+    // Fonction pour afficher une erreur
+    function showError(message) {
+        errorDiv.textContent = message;
+        errorDiv.classList.remove('d-none');
+    }
+
+    // Fonction pour masquer l'erreur
+    function hideError() {
+        errorDiv.classList.add('d-none');
+    }
+
+    // Gestionnaires d'événements
+    document.querySelectorAll('input[name="reduction_type"]').forEach(input => {
+        input.addEventListener('change', updateReductionType);
+    });
+
+    [percentageInput, amountInput].forEach(input => {
+        input.addEventListener('input', updatePreview);
+    });
+
+    // Validation du formulaire
+    form.addEventListener('submit', function(event) {
+        const reductionType = document.querySelector('input[name="reduction_type"]:checked').value;
+        let isValid = true;
+        let errorMessage = '';
+
+        if (reductionType === 'percent') {
+            const percentage = parseFloat(percentageInput.value);
+            if (isNaN(percentage) || percentage < 0 || percentage > 100) {
+                errorMessage = 'Veuillez entrer un pourcentage valide entre 0 et 100';
+                isValid = false;
+            }
+        } else {
+            const amount = parseFloat(amountInput.value);
+            if (isNaN(amount) || amount < 0 || amount > parseFloat(selectedItem.prix_original)) {
+                errorMessage = 'Veuillez entrer un montant valide';
+                isValid = false;
+            }
+        }
+
+        if (!isValid) {
+            event.preventDefault();
+            showError(errorMessage);
+        }
+    });
+
+    // Initialisation lors de l'ouverture du modal
+    document.getElementById('reductionModal').addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const codeEan = button.getAttribute('data-code-ean');
+        document.getElementById('code_ean_input').value = codeEan;
+
+        // Récupérer les informations de l'article
+        selectedItem = getArticleFromCart(codeEan);
+        if (selectedItem) {
+            document.getElementById('itemName').textContent = selectedItem.nom;
+            document.getElementById('itemOriginalPrice').textContent = `${selectedItem.prix_original} €`;
+            document.getElementById('itemQuantity').textContent = selectedItem.quantite;
+        }
+
+        // Réinitialiser le formulaire
+        form.reset();
+        hideError();
+        updateReductionType();
+        
+        // Focus sur le champ actif
+        setTimeout(() => {
+            document.querySelector('input[name="reduction_type"]:checked').value === 'percent' 
+                ? percentageInput.focus() 
+                : amountInput.focus();
+        }, 500);
+    });
+});
+
+// Fonction pour récupérer les informations d'un article du panier
+function getArticleFromCart(codeEan) {
+    const panier = {{ panier|safe|default:'{}' }};
+    return panier[codeEan];
+}
+</script>

@@ -38,6 +38,7 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     'localhost',
 ]
+
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
 SECURE_SSL_REDIRECT = True
@@ -140,6 +141,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [
+    BASE_DIR / "divino_pos/static",  # Chemin vers le dossier static
+]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Chemin local pour stocker vos fichiers statiques pendant le développement
@@ -156,7 +160,16 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000  # Augmente cette valeur selon tes besoins
 
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = True
 
 CORS_ALLOW_ALL_ORIGINS = True
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
 

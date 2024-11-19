@@ -1,45 +1,224 @@
-<!-- Modale pour ajouter un produit manuellement -->
+<!-- Modal d'ajout de produit -->
 <div class="modal fade" id="addProductModal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="POST" action="{% url 'add_product' %}">
-                {% csrf_token %}
-                <div class="modal-header">
-                    <h5 class="modal-title" id="addProductModalLabel">Ajouter un Produit</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
-                </div>
-                <div class="modal-body">
-                    <!-- Afficher les erreurs non liées aux champs -->
-                    {% if product_form.non_field_errors %}
-                        <div class="alert alert-danger">
-                            {{ product_form.non_field_errors }}
+            <!-- En-tête du modal -->
+            <div class="modal-header">
+                <h5 class="modal-title" id="addProductModalLabel">
+                    <i class="fas fa-box me-2"></i>Ajouter un produit
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+
+            <!-- Corps du modal -->
+            <div class="modal-body">
+                <form id="addProductForm" method="POST" action="{% url 'add_product' %}">
+                    {% csrf_token %}
+
+                    <!-- Code EAN -->
+                    <div class="mb-3">
+                        <label for="code_ean" class="form-label">Code EAN</label>
+                        <div class="input-group">
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="code_ean" 
+                                   name="code_ean" 
+                                   maxlength="13"
+                                   pattern="[0-9]*">
+                            <button type="button" 
+                                    class="btn btn-outline-secondary" 
+                                    onclick="generateEAN()">
+                                <i class="fas fa-random"></i>
+                            </button>
                         </div>
-                    {% endif %}
-                    {% for field in product_form %}
-                        <div class="mb-3">
-                            {{ field.label_tag }}
-                            {{ field }}
-                            {% if field.errors %}
-                                <div class="text-danger">{{ field.errors }}</div>
-                            {% endif %}
+                        <div class="form-text">
+                            Laissez vide pour générer automatiquement
                         </div>
-                    {% endfor %}
-                </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary">Ajouter le Produit</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                </div>
-            </form>
+                    </div>
+
+                    <!-- Code Article -->
+                    <div class="mb-3">
+                        <label for="code_article" class="form-label">Code Article</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="code_article" 
+                               name="code_article">
+                        <div class="form-text">
+                            Code interne du produit (optionnel)
+                        </div>
+                    </div>
+
+                    <!-- Nom Article -->
+                    <div class="mb-3">
+                        <label for="nom_article" class="form-label">Nom du produit</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="nom_article" 
+                               name="nom_article" 
+                               required>
+                    </div>
+
+                    <!-- Prix de vente -->
+                    <div class="mb-3">
+                        <label for="prix_vente" class="form-label">Prix de vente</label>
+                        <div class="input-group">
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="prix_vente" 
+                                   name="prix_vente" 
+                                   min="0" 
+                                   step="0.01" 
+                                   required>
+                            <span class="input-group-text">€</span>
+                        </div>
+                    </div>
+
+                    <!-- Catégorie -->
+                    <div class="mb-3">
+                        <label for="categorie" class="form-label">Catégorie</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="categorie" 
+                               name="categorie">
+                    </div>
+
+                    <!-- Couleur -->
+                    <div class="mb-3">
+                        <label for="couleurs" class="form-label">Couleur</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="couleurs" 
+                               name="couleurs">
+                    </div>
+
+                    <!-- Taille -->
+                    <div class="mb-3">
+                        <label for="tailles" class="form-label">Taille</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="tailles" 
+                               name="tailles">
+                    </div>
+
+                    <!-- Quantité -->
+                    <div class="mb-3">
+                        <label for="quantite" class="form-label">Quantité en stock</label>
+                        <input type="number" 
+                               class="form-control" 
+                               id="quantite" 
+                               name="quantite" 
+                               min="0" 
+                               value="1" 
+                               required>
+                    </div>
+
+                    <!-- Quantité à ajouter au panier -->
+                    <div class="mb-3">
+                        <label for="quantite_panier" class="form-label">Quantité à ajouter au panier</label>
+                        <input type="number" 
+                               class="form-control" 
+                               id="quantite_panier" 
+                               name="quantite_panier" 
+                               min="1" 
+                               value="1" 
+                               required>
+                    </div>
+
+                    <!-- Message d'erreur -->
+                    <div id="productError" class="alert alert-danger d-none"></div>
+                </form>
+            </div>
+
+            <!-- Pied du modal -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Annuler
+                </button>
+                <button type="submit" form="addProductForm" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Ajouter le produit
+                </button>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Script pour réouvrir la modale si nécessaire -->
-{% if show_add_product_modal %}
+<!-- Script de gestion de l'ajout de produit -->
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var addProductModal = new bootstrap.Modal(document.getElementById('addProductModal'));
-        addProductModal.show();
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('addProductForm');
+    const errorDiv = document.getElementById('productError');
+    const quantiteStock = document.getElementById('quantite');
+    const quantitePanier = document.getElementById('quantite_panier');
+    const prixVente = document.getElementById('prix_vente');
+
+    // Validation du formulaire
+    form.addEventListener('submit', function(event) {
+        errorDiv.classList.add('d-none');
+        let hasError = false;
+
+        // Validation du prix
+        if (parseFloat(prixVente.value) <= 0) {
+            errorDiv.textContent = 'Le prix de vente doit être supérieur à 0';
+            hasError = true;
+        }
+
+        // Validation des quantités
+        if (parseInt(quantiteStock.value) < 0) {
+            errorDiv.textContent = 'La quantité en stock ne peut pas être négative';
+            hasError = true;
+        }
+
+        if (parseInt(quantitePanier.value) <= 0) {
+            errorDiv.textContent = 'La quantité à ajouter au panier doit être supérieure à 0';
+            hasError = true;
+        }
+
+        if (parseInt(quantitePanier.value) > parseInt(quantiteStock.value)) {
+            errorDiv.textContent = 'La quantité à ajouter au panier ne peut pas dépasser le stock';
+            hasError = true;
+        }
+
+        if (hasError) {
+            event.preventDefault();
+            errorDiv.classList.remove('d-none');
+        }
     });
+
+    // Mise à jour automatique de la quantité panier
+    quantiteStock.addEventListener('input', function() {
+        const stockValue = parseInt(this.value) || 0;
+        const panierValue = parseInt(quantitePanier.value) || 0;
+        
+        if (panierValue > stockValue) {
+            quantitePanier.value = stockValue;
+        }
+    });
+
+    // Réinitialisation du formulaire à l'ouverture du modal
+    document.getElementById('addProductModal').addEventListener('shown.bs.modal', function() {
+        form.reset();
+        errorDiv.classList.add('d-none');
+        document.getElementById('nom_article').focus();
+    });
+});
+
+// Fonction pour générer un code EAN aléatoire
+function generateEAN() {
+    const eanInput = document.getElementById('code_ean');
+    let ean = '';
+    
+    // Générer 12 chiffres aléatoires
+    for (let i = 0; i < 12; i++) {
+        ean += Math.floor(Math.random() * 10);
+    }
+    
+    // Calculer le chiffre de contrôle
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+        sum += parseInt(ean[i]) * (i % 2 === 0 ? 1 : 3);
+    }
+    const checkDigit = (10 - (sum % 10)) % 10;
+    
+    eanInput.value = ean + checkDigit;
+}
 </script>
-{% endif %}

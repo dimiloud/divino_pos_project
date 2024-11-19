@@ -66,11 +66,11 @@
                             {% endif %}
                         </td>
                         <td>
-                            <a href="{% url 'transaction_detail' transaction.id %}" class="btn btn-info btn-sm">Voir Détails</a>
+                            <a href="{% url 'transaction_detail' transaction_pk=transaction.pk %}" class="btn btn-info btn-sm">Voir Détails</a>
                         </td>
                         <td>
                             <!-- Bouton Gérer les Retours -->
-                            <a href="{% url 'manage_return' transaction.id %}" class="btn btn-sm btn-danger">Gérer les Retours</a>
+                            <a href="{% url 'manage_return' transaction_pk=transaction.pk %}" class="btn btn-sm btn-danger">Gérer les Retours</a>
                         </td>
                     </tr>
                     {% endfor %}

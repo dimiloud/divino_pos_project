@@ -62,7 +62,7 @@ class ProductAdmin(admin.ModelAdmin):
 
 # Administration du modèle Transaction
 class TransactionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'client', 'total_price', 'total_reduction', 'points_applied', 'credit_applied', 'date')
+    list_display = ('uuid', 'client', 'total_price', 'total_reduction', 'points_applied', 'credit_applied', 'date')
     list_filter = ('date', 'client')
     search_fields = ('client__prenom', 'client__nom', 'client__n_carte')
     date_hierarchy = 'date'

@@ -104,8 +104,6 @@ class Client(models.Model):
         validators=[MinValueValidator(Decimal('0.00'))],
         help_text="Points de fidélité accumulés par le client."
     )
-    n_carte = models.CharField(max_length=50, blank=True, null=True, unique=True)  # Ajouté
-
     def __str__(self):
         return f"{self.prenom} {self.nom}"
 
@@ -143,13 +141,13 @@ class Client(models.Model):
         verbose_name_plural = "Clients"
 
 class Transaction(models.Model):
-    MODE_PAIEMENT_CHOICES = [
-        ('carte', 'Carte Bancaire'),
-        ('cash', 'Espèces'),
-    ]
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    numero_transaction = models.CharField(
+        max_length=20, unique=True, editable=False, null=True, blank=True
+    )
 
     client = models.ForeignKey(
-        Client, null=True, blank=True, on_delete=models.SET_NULL, related_name='transactions'
+        'Client', null=True, blank=True, on_delete=models.SET_NULL, related_name='transactions'
     )
     total_price = models.DecimalField(
         max_digits=10, decimal_places=2,
@@ -161,29 +159,37 @@ class Transaction(models.Model):
     )
     total_items = models.PositiveIntegerField(default=0)
     credit_applied = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=Decimal('0.00'),
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
         help_text="Montant du crédit appliqué à cette transaction."
     )
     points_applied = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=Decimal('0.00'),
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
         help_text="Montant des points de fidélité appliqués à cette transaction."
     )
     points_gagnes = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=Decimal('0.00'),
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
         help_text="Points gagnés lors de cette transaction."
     )
     date = models.DateTimeField(default=timezone.now)
-    mode_paiement = models.CharField(max_length=20, choices=MODE_PAIEMENT_CHOICES)
+    # Supprimer le champ 'mode_paiement' car nous allons utiliser 'PaymentDetail'
 
     def __str__(self):
         client_name = f"{self.client.prenom} {self.client.nom}" if self.client else "Anonyme"
-        return f"Transaction {self.id} - Client: {client_name}"
+        return f"Transaction {self.numero_transaction} - Client: {client_name}"
+
+    def save(self, *args, **kwargs):
+        if not self.numero_transaction:
+            self.numero_transaction = self.generate_unique_transaction_number()
+        super(Transaction, self).save(*args, **kwargs)
+
+    def generate_unique_transaction_number(self):
+        """
+        Génère un numéro unique de transaction aléatoire.
+        """
+        while True:
+            number = ''.join(random.choices('0123456789', k=10))
+            if not Transaction.objects.filter(numero_transaction=number).exists():
+                return number
 
     def calculate_totals(self):
         """
@@ -194,7 +200,7 @@ class Transaction(models.Model):
             (item.price - item.reduction) * item.quantity for item in items
         ) - self.credit_applied - self.points_applied
         self.total_reduction = sum(
-            (item.reduction * item.quantity) for item in items
+            item.reduction * item.quantity for item in items
         ) + self.credit_applied + self.points_applied
         self.total_items = sum(item.quantity for item in items)
         self.save()
@@ -209,11 +215,18 @@ class Transaction(models.Model):
 
         return self.total_price - total_returned_amount
 
+    def clean(self):
+        """
+        Valide les montants pour s'assurer qu'ils sont cohérents.
+        """
+        if self.total_price < 0:
+            raise ValidationError("Le total de la transaction ne peut pas être négatif.")
+        if self.total_reduction > self.total_price:
+            raise ValidationError("Les réductions ne peuvent pas dépasser le total de la transaction.")
+
     class Meta:
         verbose_name = "Transaction"
         verbose_name_plural = "Transactions"
-
-
 class TransactionItem(models.Model):
     transaction = models.ForeignKey(
         Transaction, related_name='items', on_delete=models.CASCADE
@@ -282,7 +295,20 @@ class TransactionItem(models.Model):
     class Meta:
         verbose_name = "Article de Transaction"
         verbose_name_plural = "Articles de Transaction"
+        
+class PaymentDetail(models.Model):
+    transaction = models.ForeignKey(
+        Transaction, related_name='payments', on_delete=models.CASCADE
+    )
+    method = models.CharField(max_length=50)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
 
+    def __str__(self):
+        return f"{self.method.capitalize()} - {self.amount} €"
+
+    class Meta:
+        verbose_name = "Détail de Paiement"
+        verbose_name_plural = "Détails de Paiement"
 
 class Return(models.Model):
     transaction_item = models.ForeignKey(

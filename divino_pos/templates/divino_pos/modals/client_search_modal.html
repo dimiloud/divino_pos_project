@@ -1,27 +1,93 @@
-<!-- client_search_modal.html -->
+<!-- Modal de recherche client -->
 <div class="modal fade" id="clientSearchModal" tabindex="-1" aria-labelledby="clientSearchModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
+            <!-- En-tête du modal -->
             <div class="modal-header">
-                <h5 class="modal-title">Sélectionnez un client</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title" id="clientSearchModalLabel">
+                    <i class="fas fa-search me-2"></i>Résultats de recherche
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
             </div>
+
+            <!-- Corps du modal -->
             <div class="modal-body">
-                <p>Plusieurs clients trouvés :</p>
-                <ul class="list-group">
-                    {% for client in search_results %}
-                    <li class="list-group-item">
-                        <form method="POST" action="{% url 'pos' %}">
-                            {% csrf_token %}
-                            <input type="hidden" name="selected_client_id" value="{{ client.id }}">
-                            <button type="submit" class="btn btn-link">
-                                {{ client.prenom }} {{ client.nom }} - {{ client.email }}
-                            </button>
-                        </form>
-                    </li>
-                    {% endfor %}
-                </ul>
+                {% if search_results %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Nom</th>
+                                <th>Prénom</th>
+                                <th>Email</th>
+                                <th>Téléphone</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for client in search_results %}
+                            <tr>
+                                <td>{{ client.nom }}</td>
+                                <td>{{ client.prenom }}</td>
+                                <td>{{ client.email|default:"-" }}</td>
+                                <td>{{ client.telephone|default:"-" }}</td>
+                                <td>
+                                    <form method="POST" action="{% url 'pos' %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="selected_client_id" value="{{ client.id }}">
+                                        <button type="submit" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-user-check me-1"></i>Sélectionner
+                                        </button>
+                                    </form>
+                                    <a href="{% url 'client_history' client.id %}" 
+                                       class="btn btn-info btn-sm" 
+                                       target="_blank">
+                                        <i class="fas fa-history me-1"></i>Historique
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-search fa-3x mb-3 text-muted"></i>
+                    <p class="text-muted">Aucun client trouvé avec ces critères.</p>
+                    <button class="btn btn-primary mt-2" 
+                            data-bs-dismiss="modal"
+                            data-bs-toggle="modal" 
+                            data-bs-target="#addClientModal">
+                        <i class="fas fa-user-plus me-2"></i>Ajouter un nouveau client
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Pied du modal -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Fermer
+                </button>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Gérer la transition entre les modales
+    const clientSearchModal = document.getElementById('clientSearchModal');
+    if (clientSearchModal) {
+        clientSearchModal.addEventListener('hidden.bs.modal', function (event) {
+            // Si le bouton "Ajouter un nouveau client" a été cliqué
+            if (event.clickEvent && 
+                event.clickEvent.target && 
+                event.clickEvent.target.dataset.bsToggle === 'modal') {
+                const addClientModal = new bootstrap.Modal(document.getElementById('addClientModal'));
+                addClientModal.show();
+            }
+        });
+    }
+});
+</script>

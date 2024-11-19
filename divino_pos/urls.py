@@ -1,7 +1,6 @@
-# divino_pos/urls.py
-
 from django.urls import path
 from . import views
+from django.views.decorators.csrf import csrf_exempt
 
 urlpatterns = [
     # Page principale du POS
@@ -34,7 +33,7 @@ urlpatterns = [
 
     # Gestion des transactions
     path('transactions/add/', views.add_transaction, name='add_transaction'),  # Ajout d'une transaction
-    path('transactions/<int:transaction_id>/', views.transaction_detail, name='transaction_detail'),  # Détails d'une transaction
+    path('transaction/<uuid:transaction_pk>/', views.transaction_detail, name='transaction_detail'),  # Détails d'une transaction
 
     # Historique des ventes et rapports
     path('sales-history/', views.sales_history_view, name='sales_history'),
@@ -42,15 +41,17 @@ urlpatterns = [
     path('sales-report/pdf/', views.generate_pdf_report, name='sales_report_pdf'),
 
     # Gestion des retours
-    path('returns/manage/<int:transaction_id>/', views.manage_return, name='manage_return'),
+    path('returns/manage/<uuid:transaction_pk>/', views.manage_return, name='manage_return'),  # UUID pour les transactions
     path('returns/item/<int:transaction_item_id>/', views.return_item_view, name='return_item_view'),
 
     # Ajustement du stock
     path('update-stock/', views.update_stock, name='update_stock'),
 
     # Génération du ticket de caisse
-    path('ticket/<int:transaction_id>/', views.generate_ticket_de_caisse, name='generate_ticket'),
+    path('ticket/<uuid:transaction_pk>/', views.generate_ticket_de_caisse, name='generate_ticket'),
 
-    # fonction de lecteur eid
-    path('read_eid/', views.read_eid, name='read_eid'),
+    # Fonction de lecteur eid
+    path('api/read-eid/', views.read_eid_data, name='read_eid_data'),
+    path('api/search-client-eid/', views.search_client_eid, name='search_client_eid'),
+
 ]

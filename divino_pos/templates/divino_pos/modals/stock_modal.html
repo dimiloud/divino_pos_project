@@ -1,31 +1,107 @@
-<!-- stock_modal.html -->
+<!-- Modal de mise à jour du stock -->
 <div class="modal fade" id="stockModal" tabindex="-1" aria-labelledby="stockModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
+            <!-- En-tête du modal -->
             <div class="modal-header">
-                <h5 class="modal-title text-center w-100" id="stockModalLabel" style="color: red; font-weight: bold;">
-                    <i class="fas fa-exclamation-triangle"></i> Stock Insuffisant
+                <h5 class="modal-title" id="stockModalLabel">
+                    <i class="fas fa-box me-2"></i>Mise à jour du stock
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
             </div>
+
+            <!-- Corps du modal -->
             <div class="modal-body">
                 {% if product_insufficient_stock %}
-                <p>Le stock est insuffisant pour le produit <strong>{{ product_insufficient_stock.nom_article }}</strong>.</p>
-                <form method="POST" action="{% url 'pos' %}">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Stock insuffisant pour l'article "{{ product_insufficient_stock.nom_article }}"
+                </div>
+
+                <form id="stockUpdateForm" method="POST" action="{% url 'update_stock' %}">
                     {% csrf_token %}
                     <input type="hidden" name="product_id" value="{{ product_insufficient_stock.id }}">
+                    
                     <div class="mb-3">
-                        <label for="new_stock" class="form-label">Nouvelle quantité :</label>
-                        <input type="number" id="new_stock" name="new_stock" class="form-control" required>
+                        <label for="current_stock" class="form-label">Stock actuel</label>
+                        <input type="number" 
+                               class="form-control" 
+                               id="current_stock" 
+                               value="{{ product_insufficient_stock.quantite }}" 
+                               disabled>
                     </div>
-                    <div class="text-center">
-                        <button type="submit" class="btn btn-primary" name="correct_stock">Corriger le stock</button>
+
+                    <div class="mb-3">
+                        <label for="new_stock" class="form-label">Nouveau stock</label>
+                        <input type="number" 
+                               class="form-control" 
+                               id="new_stock" 
+                               name="new_stock" 
+                               min="0" 
+                               value="{{ product_insufficient_stock.quantite }}" 
+                               required>
+                        <div class="form-text">
+                            Entrez la nouvelle quantité en stock
+                        </div>
                     </div>
+
+                    <!-- Message d'erreur -->
+                    <div id="stockError" class="alert alert-danger d-none"></div>
                 </form>
                 {% else %}
-                <p>Aucun produit sélectionné pour la correction du stock.</p>
+                <div class="text-center py-4">
+                    <i class="fas fa-box-open fa-3x mb-3 text-muted"></i>
+                    <p class="text-muted">Aucun produit sélectionné pour la mise à jour du stock.</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Pied du modal -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Annuler
+                </button>
+                {% if product_insufficient_stock %}
+                <button type="submit" form="stockUpdateForm" class="btn btn-primary">
+                    <i class="fas fa-save me-2"></i>Mettre à jour le stock
+                </button>
                 {% endif %}
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('stockUpdateForm');
+    const errorDiv = document.getElementById('stockError');
+    const newStockInput = document.getElementById('new_stock');
+
+    if (form) {
+        form.addEventListener('submit', function(event) {
+            errorDiv.classList.add('d-none');
+            const newStock = parseInt(newStockInput.value);
+
+            if (isNaN(newStock) || newStock < 0) {
+                event.preventDefault();
+                errorDiv.textContent = 'La quantité en stock doit être un nombre positif';
+                errorDiv.classList.remove('d-none');
+            }
+        });
+    }
+
+    // Réinitialisation du formulaire à l'ouverture du modal
+    const stockModal = document.getElementById('stockModal');
+    if (stockModal) {
+        stockModal.addEventListener('shown.bs.modal', function() {
+            if (newStockInput) {
+                newStockInput.focus();
+                newStockInput.select();
+            }
+            if (errorDiv) {
+                errorDiv.classList.add('d-none');
+            }
+        });
+    }
+});
+</script>

@@ -1,21 +1,156 @@
-<!-- confirm_credit_modal.html -->
+<!-- Modal de confirmation pour l'application du crédit client -->
 <div class="modal fade" id="confirmApplyCreditModal" tabindex="-1" aria-labelledby="confirmApplyCreditModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" action="{% url 'pos' %}">
-                {% csrf_token %}
-                <div class="modal-header">
-                    <h5 class="modal-title" id="confirmApplyCreditModalLabel">Confirmer l'application du crédit</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Êtes-vous sûr de vouloir appliquer le crédit disponible de {{ selected_client.credit|floatformat:2 }} € ?</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                    <button type="submit" name="apply_credit" class="btn btn-primary">Confirmer</button>
-                </div>
-            </form>
+            <!-- En-tête du modal -->
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmApplyCreditModalLabel">
+                    <i class="fas fa-coins me-2"></i>Utiliser le crédit client
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+
+            <!-- Corps du modal -->
+            <div class="modal-body">
+                <form id="applyCreditForm" method="POST" action="{% url 'pos' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="apply_credit" value="true">
+
+                    <div class="credit-info mb-4">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Crédit disponible</span>
+                                    <strong class="text-success">{{ selected_client.credit|floatformat:2 }} €</strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Total à payer</span>
+                                    <strong>{{ total_a_payer|floatformat:2 }} €</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="credit_amount" class="form-label">Montant du crédit à utiliser</label>
+                        <div class="input-group">
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="credit_amount" 
+                                   name="credit_to_apply" 
+                                   min="0" 
+                                   max="{{ selected_client.credit }}" 
+                                   step="0.01" 
+                                   value="{{ selected_client.credit }}"
+                                   required>
+                            <span class="input-group-text">€</span>
+                        </div>
+                        <div class="form-text">
+                            Maximum disponible : {{ selected_client.credit|floatformat:2 }} €
+                        </div>
+                    </div>
+
+                    <div class="credit-preview mb-3 d-none" id="creditPreview">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">Aperçu après application du crédit</h6>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Crédit appliqué</span>
+                                    <span class="text-success" id="appliedCredit">0.00 €</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Crédit restant</span>
+                                    <span id="remainingCredit">{{ selected_client.credit|floatformat:2 }} €</span>
+                                </div>
+                                <hr>
+                                <div class="d-flex justify-content-between">
+                                    <strong>Nouveau total à payer</strong>
+                                    <strong id="newTotal">{{ total_a_payer|floatformat:2 }} €</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Message d'erreur -->
+                    <div id="creditError" class="alert alert-danger d-none"></div>
+                </form>
+            </div>
+
+            <!-- Pied du modal -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Annuler
+                </button>
+                <button type="submit" form="applyCreditForm" class="btn btn-success">
+                    <i class="fas fa-check me-2"></i>Appliquer le crédit
+                </button>
+            </div>
         </div>
     </div>
 </div>
+
+<!-- Script de gestion du crédit -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('applyCreditForm');
+    const creditInput = document.getElementById('credit_amount');
+    const previewSection = document.getElementById('creditPreview');
+    const errorDiv = document.getElementById('creditError');
+    
+    const availableCredit = parseFloat('{{ selected_client.credit|floatformat:2 }}');
+    const totalToPay = parseFloat('{{ total_a_payer|floatformat:2 }}');
+
+    function updateCreditPreview() {
+        const creditAmount = parseFloat(creditInput.value) || 0;
+        
+        // Validation
+        if (creditAmount < 0 || creditAmount > availableCredit) {
+            errorDiv.textContent = `Le montant doit être compris entre 0 et ${availableCredit.toFixed(2)} €`;
+            errorDiv.classList.remove('d-none');
+            previewSection.classList.add('d-none');
+            return;
+        }
+
+        if (creditAmount > totalToPay) {
+            errorDiv.textContent = 'Le crédit appliqué ne peut pas dépasser le total à payer';
+            errorDiv.classList.remove('d-none');
+            previewSection.classList.add('d-none');
+            return;
+        }
+
+        errorDiv.classList.add('d-none');
+        
+        // Calculs
+        const remainingCredit = (availableCredit - creditAmount).toFixed(2);
+        const newTotal = (totalToPay - creditAmount).toFixed(2);
+
+        // Mise à jour de l'aperçu
+        document.getElementById('appliedCredit').textContent = `-${creditAmount.toFixed(2)} €`;
+        document.getElementById('remainingCredit').textContent = `${remainingCredit} €`;
+        document.getElementById('newTotal').textContent = `${newTotal} €`;
+        
+        previewSection.classList.remove('d-none');
+    }
+
+    // Événement pour mettre à jour l'aperçu
+    creditInput.addEventListener('input', updateCreditPreview);
+
+    // Validation du formulaire
+    form.addEventListener('submit', function(event) {
+        const creditAmount = parseFloat(creditInput.value);
+        
+        if (isNaN(creditAmount) || creditAmount < 0 || creditAmount > availableCredit || creditAmount > totalToPay) {
+            event.preventDefault();
+            errorDiv.textContent = 'Montant de crédit invalide';
+            errorDiv.classList.remove('d-none');
+        }
+    });
+
+    // Initialiser l'aperçu quand le modal est ouvert
+    document.getElementById('confirmApplyCreditModal').addEventListener('shown.bs.modal', function() {
+        creditInput.value = Math.min(availableCredit, totalToPay).toFixed(2);
+        updateCreditPreview();
+        creditInput.focus();
+    });
+});
+</script>

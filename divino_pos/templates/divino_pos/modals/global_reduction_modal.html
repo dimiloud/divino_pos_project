@@ -1,22 +1,128 @@
-<!-- global_reduction_modal.html -->
+<!-- Modal de réduction globale -->
 <div class="modal fade" id="globalReductionModal" tabindex="-1" aria-labelledby="globalReductionModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
+            <!-- En-tête du modal -->
             <div class="modal-header">
-                <h5 class="modal-title">Appliquer une réduction sur le panier total</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title" id="globalReductionModalLabel">
+                    <i class="fas fa-percent me-2"></i>Appliquer une réduction globale
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
             </div>
+
+            <!-- Corps du modal -->
             <div class="modal-body">
-                <form method="POST" action="{% url 'apply_global_discount' %}">
+                <form id="globalReductionForm" method="POST" action="{% url 'apply_global_discount' %}">
                     {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="global_discount_percentage" class="form-label">Pourcentage de réduction (%)</label>
-                        <input type="number" class="form-control" id="global_discount_percentage" 
-                               name="global_discount_percentage" min="0" max="100" required>
+                    
+                    <div class="mb-4">
+                        <label for="global_discount_percentage" class="form-label">Pourcentage de réduction</label>
+                        <div class="input-group">
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="global_discount_percentage" 
+                                   name="global_discount_percentage" 
+                                   min="0" 
+                                   max="100" 
+                                   step="0.01" 
+                                   required
+                                   value="{{ global_discount_percentage|default:0 }}">
+                            <span class="input-group-text">%</span>
+                        </div>
+                        <div class="form-text">
+                            Entrez un pourcentage entre 0 et 100
+                        </div>
                     </div>
-                    <button type="submit" class="btn btn-primary">Appliquer la réduction</button>
+
+                    <div class="reduction-preview mb-3 d-none" id="reductionPreview">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">Aperçu de la réduction</h6>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Total avant réduction</span>
+                                    <span id="totalBeforeDiscount">{{ total_panier|floatformat:2 }} €</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Montant de la réduction</span>
+                                    <span class="text-danger" id="discountAmount">0.00 €</span>
+                                </div>
+                                <hr>
+                                <div class="d-flex justify-content-between">
+                                    <strong>Total après réduction</strong>
+                                    <strong id="totalAfterDiscount">{{ total_panier|floatformat:2 }} €</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Message d'erreur -->
+                    <div id="globalDiscountError" class="alert alert-danger d-none"></div>
                 </form>
+            </div>
+
+            <!-- Pied du modal -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Annuler
+                </button>
+                <button type="submit" form="globalReductionForm" class="btn btn-primary">
+                    <i class="fas fa-check me-2"></i>Appliquer la réduction
+                </button>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Script de gestion de la réduction globale -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('globalReductionForm');
+    const percentageInput = document.getElementById('global_discount_percentage');
+    const previewSection = document.getElementById('reductionPreview');
+    const errorDiv = document.getElementById('globalDiscountError');
+    const totalBeforeDiscount = parseFloat('{{ total_panier|floatformat:2 }}');
+
+    function updatePreview() {
+        const percentage = parseFloat(percentageInput.value) || 0;
+        
+        // Validation
+        if (percentage < 0 || percentage > 100) {
+            errorDiv.textContent = 'Le pourcentage doit être compris entre 0 et 100';
+            errorDiv.classList.remove('d-none');
+            previewSection.classList.add('d-none');
+            return;
+        }
+
+        errorDiv.classList.add('d-none');
+        
+        // Calculs
+        const discountAmount = (totalBeforeDiscount * percentage / 100).toFixed(2);
+        const totalAfterDiscount = (totalBeforeDiscount - discountAmount).toFixed(2);
+
+        // Mise à jour de l'aperçu
+        document.getElementById('discountAmount').textContent = `-${discountAmount} €`;
+        document.getElementById('totalAfterDiscount').textContent = `${totalAfterDiscount} €`;
+        
+        previewSection.classList.remove('d-none');
+    }
+
+    // Événement pour mettre à jour l'aperçu
+    percentageInput.addEventListener('input', updatePreview);
+
+    // Validation du formulaire
+    form.addEventListener('submit', function(event) {
+        const percentage = parseFloat(percentageInput.value);
+        
+        if (isNaN(percentage) || percentage < 0 || percentage > 100) {
+            event.preventDefault();
+            errorDiv.textContent = 'Veuillez entrer un pourcentage valide entre 0 et 100';
+            errorDiv.classList.remove('d-none');
+        }
+    });
+
+    // Initialiser l'aperçu si une valeur existe déjà
+    if (percentageInput.value) {
+        updatePreview();
+    }
+});
+</script>

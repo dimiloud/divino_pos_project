@@ -1,0 +1,38 @@
+<!-- payment_modal.html -->
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="paymentModalLabel">Sélectionner le mode de paiement</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-center">Choisissez votre mode de paiement :</p>
+                <form method="POST" action="{% url 'finalize_sale' %}">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-around">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="mode_paiement" 
+                                   id="paymentCard" value="carte" required>
+                            <label class="form-check-label" for="paymentCard">
+                                <i class="fas fa-credit-card fa-2x text-primary"></i>
+                                Carte
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="mode_paiement" 
+                                   id="paymentCash" value="cash" required>
+                            <label class="form-check-label" for="paymentCash">
+                                <i class="fas fa-money-bill-wave fa-2x text-secondary"></i>
+                                Cash
+                            </label>
+                        </div>
+                    </div>
+                    <div class="text-center mt-4">
+                        <button type="submit" class="btn btn-success">Confirmer le paiement</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

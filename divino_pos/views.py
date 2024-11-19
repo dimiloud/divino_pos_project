@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from decimal import Decimal, ROUND_HALF_UP, ROUND_DOWN
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, ROUND_DOWN
 from datetime import datetime, timedelta
 from django.contrib import messages
 from .forms import DiscountForm, StockUpdateForm, ProductForm, ClientCreationForm
@@ -18,14 +18,14 @@ from django.middleware.csrf import get_token
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.urls import reverse
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_http_methods
 from xhtml2pdf import pisa
 import pandas as pd
 import requests
 import json
 from .forms import ReturnForm
 from .models import (
-    Client, Product, Transaction, TransactionItem, Return, Voucher
+    Client, Product, Transaction, TransactionItem, Return, PaymentDetail
 )
 
 # Constantes
@@ -506,7 +506,6 @@ def remove_from_cart(request, code_ean):
         messages.success(request, "Article retiré du panier.")
     return redirect('pos')
 
-# Fonction pour finaliser la vente
 @login_required
 @transaction.atomic
 def finalize_sale(request):
@@ -528,7 +527,19 @@ def finalize_sale(request):
         client = get_object_or_404(Client, id=client_id)
 
     if request.method == 'POST':
-        mode_paiement = request.POST.get('mode_paiement')
+        # Récupérer les montants pour chaque méthode de paiement
+        payment_methods = ['cash', 'card', 'gift', 'voucher', 'transfer']
+        payment_details = {}
+        total_paid = Decimal('0.00')
+
+        for method in payment_methods:
+            amount = request.POST.get(method, '0.00')
+            amount = Decimal(amount).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            if amount < Decimal('0.00'):
+                messages.error(request, "Les montants de paiement ne peuvent pas être négatifs.")
+                return redirect('pos')
+            payment_details[method] = amount
+            total_paid += amount
 
         try:
             total_vente = Decimal('0.00')
@@ -537,23 +548,6 @@ def finalize_sale(request):
 
             # Déterminer si une réduction globale est appliquée
             reduction_globale_appliquee = global_reduction_percentage > Decimal('0.00')
-
-            # Création de la transaction
-            new_transaction = Transaction.objects.create(
-                client=client,
-                total_price=Decimal('0.00'),  # Sera mis à jour plus tard
-                total_reduction=Decimal('0.00'),  # Sera mis à jour plus tard
-                total_items=0,  # Sera mis à jour plus tard
-                points_applied=points_appliques,
-                credit_applied=credit_applique,
-                mode_paiement=mode_paiement,
-                points_gagnes=Decimal('0.00'),  # Sera mis à jour plus tard
-                date=timezone.now()
-            )
-
-            # Initialiser les points gagnés totaux et le montant éligible aux points
-            points_gagnes_total = Decimal('0.00')
-            total_eligible_amount = Decimal('0.00')
 
             # Traitement des articles du panier
             for code_ean, item in panier.items():
@@ -575,31 +569,6 @@ def finalize_sale(request):
                 total_reduction += total_item_reduction
                 total_items += quantite_demandee
 
-                # Déterminer si une promotion individuelle est appliquée sur l'article
-                promotion_individuelle = montant_reduction > Decimal('0.00')
-
-                # Déterminer si une promotion a été appliquée sur l'article (individuelle ou globale)
-                promotion_applied = promotion_individuelle or reduction_globale_appliquee
-
-                # Si aucune promotion n'est appliquée, ajouter au montant éligible aux points
-                if not promotion_applied:
-                    total_eligible_amount += total_item_vente
-
-                # Création de l'élément de transaction avec les points gagnés par article
-                transaction_item = TransactionItem.objects.create(
-                    transaction=new_transaction,
-                    product=product,
-                    quantity=quantite_demandee,
-                    price=prix_vente,
-                    reduction=montant_reduction,
-                    points_gagnes=Decimal('0.00'),  # Sera mis à jour plus tard
-                    promotion_applied=promotion_applied  # Indiquer si une promotion a été appliquée
-                )
-
-                # Mise à jour du stock
-                # product.quantite -= quantite_demandee
-                product.save()
-
             # Application de la réduction globale
             if reduction_globale_appliquee:
                 subtotal_after_item_reductions = total_vente - total_reduction
@@ -613,42 +582,59 @@ def finalize_sale(request):
             if total_a_payer < Decimal('0.00'):
                 total_a_payer = Decimal('0.00')
 
-            # Calcul des points de fidélité gagnés
-            if client and total_eligible_amount > Decimal('0.00') and not reduction_globale_appliquee:
-                # Calculer la proportion du montant éligible
-                proportion_eligible = total_eligible_amount / subtotal_after_reductions
-                # Calculer le montant payé par le client pour les articles éligibles
-                amount_paid_for_eligible_items = (total_a_payer * proportion_eligible).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                # Calculer les points gagnés
-                points_gagnes_total = (amount_paid_for_eligible_items * Decimal('0.05')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                # Ajouter les points gagnés au client
+            # Vérifier si le total payé couvre le total à payer
+            if total_paid < total_a_payer:
+                messages.error(request, "Le montant total payé est insuffisant.")
+                return redirect('pos')
+
+            # Calcul des points de fidélité gagnés (ajustez selon votre logique)
+            points_gagnes_total = Decimal('0.00')
+            if client and total_a_payer > Decimal('0.00') and not reduction_globale_appliquee:
+                points_gagnes_total = (total_a_payer * Decimal('0.05')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 client.fidelity_points += points_gagnes_total
                 client.save()
-            else:
-                points_gagnes_total = Decimal('0.00')
 
-            # Mise à jour de la transaction
-            new_transaction.total_price = total_a_payer  # Montant final à payer après toutes les déductions
-            new_transaction.total_reduction = total_reduction + credit_applique + points_appliques  # Total des réductions, y compris les crédits et points appliqués
-            new_transaction.total_items = total_items
-            new_transaction.points_gagnes = points_gagnes_total
-            new_transaction.points_applied = points_appliques
-            new_transaction.credit_applied = credit_applique
-            new_transaction.mode_paiement = mode_paiement
-            new_transaction.save()
+            # Création de la transaction
+            new_transaction = Transaction.objects.create(
+                client=client,
+                total_price=total_a_payer,
+                total_reduction=total_reduction + credit_applique + points_appliques,
+                total_items=total_items,
+                points_applied=points_appliques,
+                credit_applied=credit_applique,
+                points_gagnes=points_gagnes_total,
+                date=timezone.now()
+            )
 
-            # Mise à jour des points gagnés par article dans TransactionItem
-            for item in new_transaction.items.all():
-                if item.reduction == Decimal('0.00') and not reduction_globale_appliquee:
-                    # Calculer la proportion de l'article éligible
-                    item_total = item.price * item.quantity
-                    item_proportion = item_total / total_eligible_amount if total_eligible_amount > Decimal('0.00') else Decimal('0.00')
-                    # Points gagnés pour cet article
-                    item.points_gagnes = (points_gagnes_total * item_proportion).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                    item.save()
-                else:
-                    item.points_gagnes = Decimal('0.00')
-                    item.save()
+            # Enregistrer les détails de paiement
+            for method, amount in payment_details.items():
+                if amount > Decimal('0.00'):
+                    PaymentDetail.objects.create(
+                        transaction=new_transaction,
+                        method=method,
+                        amount=amount
+                    )
+
+            # Mise à jour des articles de la transaction
+            for code_ean, item in panier.items():
+                product = Product.objects.select_for_update().get(code_ean=code_ean)
+                quantite_demandee = int(item['quantite'])
+                prix_vente = Decimal(item['prix_vente']).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                montant_reduction = (Decimal(item['prix_original']) - prix_vente).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+                # Création de l'élément de transaction
+                TransactionItem.objects.create(
+                    transaction=new_transaction,
+                    product=product,
+                    quantity=quantite_demandee,
+                    price=prix_vente,
+                    reduction=montant_reduction,
+                    points_gagnes=Decimal('0.00')  # Vous pouvez ajuster si nécessaire
+                )
+
+                # Mise à jour du stock
+                product.quantite -= quantite_demandee
+                product.save()
 
             # Application du crédit
             if client and credit_applique > Decimal('0.00'):
@@ -674,7 +660,7 @@ def finalize_sale(request):
             request.session['global_discount_percentage'] = '0.00'
 
             messages.success(request, f"Vente finalisée avec succès ! Total à payer : {total_a_payer} €. Points gagnés : {points_gagnes_total}.")
-            return redirect('generate_ticket', transaction_id=new_transaction.id)
+            return redirect('generate_ticket', transaction_pk=new_transaction.pk)
 
         except ValidationError as ve:
             messages.error(request, f"Erreur : {ve.message}")
@@ -685,6 +671,7 @@ def finalize_sale(request):
             return redirect('pos')
 
     return render(request, 'finalize_sale.html')
+
 
 # Fonction pour annuler une vente
 @login_required
@@ -728,33 +715,47 @@ def cancel_sale(request):
 def apply_discount(request):
     """
     Applique une réduction sur un article du panier.
-
-    Améliorations apportées :
-    - Validation des données entrantes.
-    - Gestion des erreurs améliorée.
-    """ 
+    """
     if request.method == "POST":
-        form = DiscountForm(request.POST)
-        if form.is_valid():
-            code_ean = form.cleaned_data['code_ean']
-            discount_percentage = form.cleaned_data['discount_percentage']
-            panier = request.session.get('panier', {})
+        code_ean = request.POST.get('code_ean')
+        reduction_type = request.POST.get('reduction_type')
+        panier = request.session.get('panier', {})
 
         if code_ean in panier:
             try:
-                discount = Decimal(discount_percentage) / 100
                 article = panier[code_ean]
                 prix_original = Decimal(article['prix_original'])
-                reduction = (prix_original * discount).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+                
+                if reduction_type == 'percent':
+                    # Réduction en pourcentage
+                    discount_percentage = Decimal(request.POST.get('discount_percentage', '0'))
+                    if discount_percentage < 0 or discount_percentage > 100:
+                        raise ValueError("Le pourcentage doit être entre 0 et 100")
+                    reduction = (prix_original * discount_percentage / 100).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+                    message = f"Réduction de {discount_percentage}% appliquée à l'article."
+                else:
+                    # Réduction en montant fixe
+                    reduction = Decimal(request.POST.get('discount_amount', '0')).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+                    if reduction < 0 or reduction > prix_original:
+                        raise ValueError("La réduction ne peut pas être négative ou supérieure au prix original")
+                    message = f"Réduction de {reduction}€ appliquée à l'article."
+
                 new_price = (prix_original - reduction).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
-                article['prix_vente'] = str(new_price)
-                article['reduction'] = True
-                article['montant_reduction'] = str(reduction)
                 quantite = Decimal(str(article['quantite']))
                 total_item = (new_price * quantite).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
-                article['total'] = str(total_item)
+
+                article.update({
+                    'prix_vente': str(new_price),
+                    'reduction': True,
+                    'montant_reduction': str(reduction),
+                    'total': str(total_item)
+                })
+
                 request.session['panier'] = panier
-                messages.success(request, f"Réduction de {discount_percentage}% appliquée à l'article.")
+                messages.success(request, message)
+
+            except (ValueError, InvalidOperation) as e:
+                messages.error(request, f"Erreur de calcul : {str(e)}")
             except Exception as e:
                 messages.error(request, f"Erreur lors de l'application de la réduction : {str(e)}")
         else:
@@ -919,7 +920,8 @@ def add_transaction(request):
             )
 
             messages.success(request, "Transaction ajoutée avec succès.")
-            return redirect('transaction_detail', transaction_id=transaction.id)
+            return redirect('transaction_detail', transaction_pk=transaction.pk)
+
         except ValidationError as e:
             messages.error(request, f"Erreur lors de l'ajout de la transaction : {e.message_dict}")
 
@@ -930,7 +932,7 @@ def add_transaction(request):
 
 # Vue pour les détails d'une transaction
 @login_required
-def transaction_detail(request, transaction_id):
+def transaction_detail(request, transaction_pk):
     """
     Affiche les détails d'une transaction spécifique.
 
@@ -946,7 +948,7 @@ def transaction_detail(request, transaction_id):
     today = timezone.now().date()
     total_sales_today = Transaction.objects.filter(date__date=today).aggregate(Sum('total_price'))['total_price__sum'] or 0
 
-    transaction = get_object_or_404(Transaction, id=transaction_id)
+    transaction = get_object_or_404(Transaction, pk=transaction_pk)
     items = transaction.items.select_related('product').all()
 
     total_adjusted = transaction.total_price
@@ -977,7 +979,7 @@ def transaction_detail(request, transaction_id):
         'total_sales_today': total_sales_today,
     }
 
-    return render(request, 'divino_pos/transaction_detail.html', context)
+    return render(request, 'divino_pos/transaction_detail.html', {'transaction': transaction})
 
 # Vue pour l'historique des ventes
 @login_required
@@ -1070,7 +1072,7 @@ def sales_report_view(request):
     # Répartition par mode de paiement
     payment_distribution = sales_data.values('mode_paiement').annotate(
         total_sales=Sum('total_price'),
-        total_transactions=Count('id')
+        total_transactions=Count('uuid')
     )
 
     # Top produits
@@ -1183,7 +1185,7 @@ def update_stock(request):
 
 # Vue pour générer un ticket de caisse
 @login_required
-def generate_ticket_de_caisse(request, transaction_id):
+def generate_ticket_de_caisse(request, transaction_pk):
     """
     Génère un ticket de caisse pour une transaction donnée.
 
@@ -1196,7 +1198,7 @@ def generate_ticket_de_caisse(request, transaction_id):
     - Sécuriser l'accès aux informations sensibles.
     - Utiliser des templates pour le rendu du ticket.
     """
-    transaction = get_object_or_404(Transaction, id=transaction_id)
+    transaction = get_object_or_404(Transaction, pk=transaction_pk)
     client = transaction.client
     transaction_items = TransactionItem.objects.filter(transaction=transaction).select_related('product')
 
@@ -1236,7 +1238,7 @@ def generate_ticket_de_caisse(request, transaction_id):
 # Vue pour gérer les retours d'articles
 @login_required
 @transaction.atomic
-def manage_return(request, transaction_id):
+def manage_return(request, transaction_pk):
     """
     Gère les retours pour une transaction donnée.
 
@@ -1256,7 +1258,7 @@ def manage_return(request, transaction_id):
     today = timezone.now().date()
     total_sales_today = Transaction.objects.filter(date__date=today).aggregate(Sum('total_price'))['total_price__sum'] or 0
 
-    transaction = get_object_or_404(Transaction, id=transaction_id)
+    transaction = get_object_or_404(Transaction, pk=transaction_pk)
     transaction_items = transaction.items.select_related('product').all()
     client = transaction.client
 
@@ -1313,7 +1315,7 @@ def manage_return(request, transaction_id):
 
                 messages.success(request, f"{quantity_to_return} x {item.product.nom_article} retourné. Crédit de {refund_amount} € ajouté au compte du client.")
 
-        return redirect('transaction_detail', transaction_id=transaction_id)
+        return redirect('transaction_detail', transaction_pk=transaction.uuid)
 
     context = {
         'transaction': transaction,
@@ -1397,7 +1399,7 @@ def return_item_view(request, transaction_item_id):
             returned_item.save()
 
             messages.success(request, f"Retour enregistré pour {transaction_item.product.nom_article} (Quantité : {quantity_returned}).")
-            return redirect('transaction_detail', transaction_id=transaction_item.transaction.id)
+            return redirect('transaction_detail', transaction_item.transaction_pk)
         else:
             messages.error(request, "Veuillez corriger les erreurs dans le formulaire.")
     else:
@@ -1544,46 +1546,125 @@ def add_product(request):
     else:
         return redirect('pos')
 
-@login_required
-@csrf_protect
-def read_eid(request):
-    if request.method == 'POST':
+@csrf_exempt
+@require_http_methods(["GET"])
+def read_eid_data(request):
+    """
+    Vue pour lire les données de la carte eID depuis plusieurs API Flask.
+    """
+    flask_api_urls = [  # Liste des adresses à tester
+        "https://192.168.1.6:5000/read_card",     # Adresse magasin
+        "https://eid.local:5000/read_card",  # Adresse atelier
+        "https://192.168.129.134:5000/read_card", # Adresse maison
+        
+    ]
+
+    def try_flask_api(index=0):
+        if index >= len(flask_api_urls):
+            return JsonResponse({
+                'success': False,
+                'message': "Toutes les tentatives de connexion à l'API Flask ont échoué."
+            }, status=500)
+
+        flask_api_url = flask_api_urls[index]
+        
         try:
-            data = json.loads(request.body)
-            # Traiter les données reçues
-            nom = data.get('nom', '').strip()
-            prenom = data.get('prenom', '').strip()
-            date_naissance = data.get('date_naissance', '').strip()
-            adresse = data.get('adresse', '').strip()
-            code_postal = data.get('code_postal', '').strip()
-            ville = data.get('ville', '').strip()
-            pays = data.get('pays', 'Belgique').strip()
-            n_carte = data.get('n_carte', '').strip()
+            # Appel à l'API Flask
+            response = requests.get(flask_api_url, timeout=10)  # Timeout de 10 secondes
 
-            # Validation des données
-            required_fields = ['nom', 'prenom', 'date_naissance', 'adresse', 'code_postal', 'ville', 'n_carte']
-            for field in required_fields:
-                if not data.get(field):
-                    return JsonResponse({'success': False, 'error': f"Le champ {field} est requis."})
+            if response.status_code == 200:
+                result = response.json()  # Lecture des données JSON
 
-            # Vérifier l'unicité du numéro de carte eID
-            if Client.objects.filter(n_carte=n_carte).exists():
-                return JsonResponse({'success': False, 'error': "Un client avec ce numéro de carte existe déjà."})
+                # Vérification des données minimales nécessaires
+                if not result.get('Nom') or not result.get('Prénom') or not result.get('Date de naissance'):
+                    return JsonResponse({
+                        'success': False,
+                        'message': "Données incomplètes reçues de l'API Flask."
+                    }, status=400)
 
-            # Préparer la réponse
-            response = {
+                # Normalisation des clés
+                normalized_data = {
+                    'nom': result.get('Nom'),
+                    'prenom': result.get('Prénom'),
+                    'date_naissance': result.get('Date de naissance'),
+                    'adresse': result.get('Numéro et rue'),
+                    'code_postal': result.get('Code postal'),
+                    'ville': result.get('Ville'),
+                    'pays': result.get('Pays'),
+                }
+
+                # Recherche d'un client existant
+                client = Client.objects.filter(
+                    nom=normalized_data['nom'],
+                    prenom=normalized_data['prenom'],
+                    date_naissance=normalized_data['date_naissance']
+                ).first()
+
+                response_data = {
+                    'success': True,
+                    'data': normalized_data,
+                    'exists': bool(client),
+                    'client_id': client.id if client else None
+                }
+
+                return JsonResponse(response_data)
+
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'message': f"Erreur de l'API Flask : Statut {response.status_code}."
+                }, status=400)
+
+        except requests.exceptions.ConnectionError:
+            # Essayer l'adresse suivante en cas d'erreur de connexion
+            return try_flask_api(index + 1)
+
+        except requests.exceptions.Timeout:
+            # Essayer l'adresse suivante en cas de timeout
+            return try_flask_api(index + 1)
+
+        except requests.exceptions.RequestException as e:
+            return JsonResponse({
+                'success': False,
+                'message': f"Erreur lors de la communication avec l'API Flask : {str(e)}"
+            }, status=500)
+
+    return try_flask_api()  # Démarrer avec la première adresse
+
+@csrf_exempt  # Si vous gérez le CSRF avec le token, vous pouvez retirer ce décorateur
+def search_client_eid(request):
+    """
+    Vue pour rechercher un client via les données eID.
+    """
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        nom = data.get('nom')
+        prenom = data.get('prenom')
+        date_naissance = data.get('date_naissance')
+
+        try:
+            client = Client.objects.get(
+                nom__iexact=nom,
+                prenom__iexact=prenom,
+                date_anniversaire=date_naissance
+            )
+            # Enregistrer le client sélectionné dans la session
+            request.session['selected_client_id'] = client.id
+
+            response_data = {
                 'success': True,
-                'nom': nom,
-                'prenom': prenom,
-                'date_naissance': date_naissance,
-                'adresse': adresse,
-                'code_postal': code_postal,
-                'ville': ville,
-                'pays': pays,
-                'n_carte': n_carte,
+                'client': {
+                    'id': client.id,
+                    'nom': client.nom,
+                    'prenom': client.prenom,
+                }
             }
-            return JsonResponse(response)
-        except json.JSONDecodeError:
-            return JsonResponse({'success': False, 'error': 'Données invalides.'})
+        except Client.DoesNotExist:
+            response_data = {
+                'success': False,
+                'message': "Client non trouvé. Vous pouvez l'ajouter."
+            }
+
+        return JsonResponse(response_data)
     else:
-        return JsonResponse({'success': False, 'error': 'Méthode non autorisée.'})
+        return JsonResponse({'success': False, 'message': 'Méthode non autorisée'}, status=405)

@@ -1,42 +1,279 @@
-{% load static %}
-<!-- add_client_modal.html -->
-
+<!-- Modal d'ajout de client -->
 <div class="modal fade" id="addClientModal" tabindex="-1" aria-labelledby="addClientModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <form method="POST" action="{% url 'pos' %}">
-                {% csrf_token %}
-                <div class="modal-header">
-                    <h5 class="modal-title" id="addClientModalLabel">teste test</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
-                </div>
-                <div class="modal-body">
+            <!-- En-tête du modal -->
+            <div class="modal-header">
+                <h5 class="modal-title text-primary" id="addClientModalLabel">
+                    <i class="fas fa-user-plus me-2"></i>Ajouter un Client
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+
+            <!-- Corps du modal -->
+            <div class="modal-body">
+                <form id="addClientForm" method="POST" action="{% url 'pos' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="add_client" value="true">
+
                     <!-- Afficher les erreurs non liées aux champs -->
                     {% if client_form.non_field_errors %}
-                        <div class="alert alert-danger">
-                            {{ client_form.non_field_errors }}
-                        </div>
+                    <div class="alert alert-danger">
+                        {{ client_form.non_field_errors }}
+                    </div>
                     {% endif %}
-                    {% for field in client_form %}
-                        <div class="mb-3">
-                            {{ field.label_tag }}
-                            {{ field }}
-                            {% if field.errors %}
-                                <div class="text-danger">{{ field.errors }}</div>
-                            {% endif %}
+
+                    <div class="row">
+                        <!-- Colonne gauche -->
+                        <div class="col-md-6">
+                            <h6 class="mb-3">Informations personnelles</h6>
+
+                            <!-- Nom -->
+                            <div class="mb-3">
+                                <label for="id_nom" class="form-label">Nom*</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="id_nom" 
+                                       name="nom" 
+                                       placeholder="Nom de famille"
+                                       required>
+                                {% if client_form.nom.errors %}
+                                <div class="text-danger">
+                                    {{ client_form.nom.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Prénom -->
+                            <div class="mb-3">
+                                <label for="id_prenom" class="form-label">Prénom*</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="id_prenom" 
+                                       name="prenom" 
+                                       placeholder="Prénom"
+                                       required>
+                                {% if client_form.prenom.errors %}
+                                <div class="text-danger">
+                                    {{ client_form.prenom.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Date de naissance -->
+                            <div class="mb-3">
+                                <label for="id_date_anniversaire" class="form-label">Date de naissance</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="id_date_anniversaire" 
+                                       name="date_anniversaire"
+                                       placeholder="JJ.MM.AAAA"
+                                       pattern="\d{2}\.\d{2}\.\d{4}"
+                                       maxlength="10">
+                            </div>
+
+                            <!-- Email -->
+                            <div class="mb-3">
+                                <label for="id_email" class="form-label">Email</label>
+                                <input type="email" 
+                                       class="form-control" 
+                                       id="id_email" 
+                                       name="email" 
+                                       placeholder="Adresse email">
+                                {% if client_form.email.errors %}
+                                <div class="text-danger">
+                                    {{ client_form.email.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Téléphone -->
+                            <div class="mb-3">
+                                <label for="id_telephone" class="form-label">Téléphone</label>
+                                <input type="tel" 
+                                       class="form-control" 
+                                       id="id_telephone" 
+                                       name="telephone" 
+                                       placeholder="Numéro de téléphone">
+                            </div>
                         </div>
-                    {% endfor %}
-                    <!-- Bouton pour lire la carte eID -->
-                    <button type="button" class="btn btn-primary" onclick="readEIDCard()">Lire carte eID</button>
+
+                        <!-- Colonne droite -->
+                        <div class="col-md-6">
+                            <h6 class="mb-3">Adresse</h6>
+
+                            <!-- Numéro et rue -->
+                            <div class="mb-3">
+                                <label for="id_numero_rue" class="form-label">Numéro et rue</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="id_numero_rue" 
+                                       name="numero_rue" 
+                                       placeholder="Numéro et nom de rue">
+                            </div>
+
+                            <!-- Code postal -->
+                            <div class="mb-3">
+                                <label for="id_code_postal" class="form-label">Code postal</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="id_code_postal" 
+                                       name="code_postal" 
+                                       placeholder="Code postal">
+                            </div>
+
+                            <!-- Ville -->
+                            <div class="mb-3">
+                                <label for="id_ville" class="form-label">Ville</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="id_ville" 
+                                       name="ville" 
+                                       placeholder="Ville">
+                            </div>
+
+                            <!-- Pays -->
+                            <div class="mb-3">
+                                <label for="id_pays" class="form-label">Pays</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="id_pays" 
+                                       name="pays" 
+                                       placeholder="Pays"
+                                       value="Belgique">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Message d'erreur -->
+                    <div id="clientError" class="alert alert-danger d-none"></div>
+                </form>
+            </div>
+
+            <!-- Pied du modal -->
+            <div class="modal-footer">
+                <div class="d-flex justify-content-between w-100">
+                    <button type="button" 
+                            class="btn btn-outline-primary" 
+                            onclick="fetchClientData()">
+                        <i class="fas fa-id-card me-2"></i>Lire carte eID
+                    </button>
+                    <div>
+                        <button type="button" 
+                                class="btn btn-outline-secondary" 
+                                data-bs-dismiss="modal">
+                            <i class="fas fa-times me-2"></i>Annuler
+                        </button>
+                        <button type="submit" 
+                                form="addClientForm" 
+                                class="btn btn-success">
+                            <i class="fas fa-user-plus me-2"></i>Ajouter le client
+                        </button>
+                    </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary">Ajouter le Client</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                </div>
-            </form>
+            </div>
         </div>
     </div>
 </div>
+
+<!-- Script de gestion de l'ajout de client -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('addClientForm');
+    const errorDiv = document.getElementById('clientError');
+
+    // Validation du formulaire
+    form.addEventListener('submit', function(event) {
+        errorDiv.classList.add('d-none');
+        let hasError = false;
+
+        // Validation du nom et prénom
+        const nom = document.getElementById('id_nom').value.trim();
+        const prenom = document.getElementById('id_prenom').value.trim();
+
+        if (!nom || !prenom) {
+            errorDiv.textContent = 'Le nom et le prénom sont obligatoires';
+            hasError = true;
+        }
+
+        // Validation de l'email si renseigné
+        const email = document.getElementById('id_email').value.trim();
+        if (email && !isValidEmail(email)) {
+            errorDiv.textContent = 'Adresse email invalide';
+            hasError = true;
+        }
+
+        // Validation de la date de naissance si renseignée
+        const dateNaissance = document.getElementById('id_date_anniversaire').value.trim();
+        if (dateNaissance && !isValidDate(dateNaissance)) {
+            errorDiv.textContent = 'Format de date invalide (JJ.MM.AAAA)';
+            hasError = true;
+        }
+
+        if (hasError) {
+            event.preventDefault();
+            errorDiv.classList.remove('d-none');
+        }
+    });
+
+    // Réinitialisation du formulaire à l'ouverture du modal
+    document.getElementById('addClientModal').addEventListener('shown.bs.modal', function() {
+        form.reset();
+        errorDiv.classList.add('d-none');
+        document.getElementById('id_nom').focus();
+        document.getElementById('id_pays').value = 'Belgique'; // Valeur par défaut
+    });
+});
+
+// Fonction de validation d'email
+function isValidEmail(email) {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+}
+
+// Fonction de validation de date
+function isValidDate(dateStr) {
+    const pattern = /^\d{2}\.\d{2}\.\d{4}$/;
+    if (!pattern.test(dateStr)) return false;
+
+    const [day, month, year] = dateStr.split('.');
+    const date = new Date(year, month - 1, day);
+    
+    return date.getDate() == day && 
+           date.getMonth() == month - 1 && 
+           date.getFullYear() == year;
+}
+
+// Fonction pour formater la date
+function formatDate(dateStr) {
+    const [day, month, year] = dateStr.split('.');
+    return `${day}.${month}.${year}`;
+}
+
+// Fonction pour la lecture de carte eID
+async function fetchClientData() {
+    try {
+        const response = await fetch('{% url "read_eid_data" %}');
+        const data = await response.json();
+        
+        if (data.success) {
+            // Remplir les champs du formulaire avec les données de la carte
+            document.getElementById('id_nom').value = data.data.nom;
+            document.getElementById('id_prenom').value = data.data.prenom;
+            document.getElementById('id_date_anniversaire').value = formatDate(data.data.date_naissance);
+            document.getElementById('id_numero_rue').value = data.data.adresse;
+            document.getElementById('id_code_postal').value = data.data.code_postal;
+            document.getElementById('id_ville').value = data.data.ville;
+            document.getElementById('id_pays').value = data.data.pays || 'Belgique';
+        } else {
+            alert(data.message || 'Erreur lors de la lecture de la carte eID');
+        }
+    } catch (error) {
+        console.error('Erreur:', error);
+        alert('Erreur lors de la lecture de la carte eID');
+    }
+}
+</script>
 
 <!-- Script pour réouvrir la modale si nécessaire -->
 {% if show_add_client_modal %}
@@ -47,69 +284,3 @@
     });
 </script>
 {% endif %}
-
-<!-- Inclure le script JavaScript -->
-<script>// static/divino_pos/js/eid_reader.js
-
-    function readEIDCard() {
-        // Vérifier que le Middleware eID est installé
-        if (typeof window.eID === 'undefined') {
-            alert('Le Middleware eID n\'est pas installé ou n\'est pas activé dans votre navigateur.');
-            return;
-        }
-    
-        // Fonction pour lire les données de la carte
-        window.eID.readIdentity(function(success, data) {
-            if (success) {
-                // Envoyer les données au serveur pour les traiter
-                fetch('/read_eid/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCookie('csrftoken'),
-                    },
-                    body: JSON.stringify(data),
-                })
-                .then(response => response.json())
-                .then(result => {
-                    if (result.success) {
-                        // Pré-remplir les champs du formulaire avec les données reçues
-                        document.getElementById('id_nom').value = result.nom;
-                        document.getElementById('id_prenom').value = result.prenom;
-                        document.getElementById('id_date_anniversaire').value = result.date_naissance;
-                        document.getElementById('id_numero_rue').value = result.adresse;
-                        document.getElementById('id_code_postal').value = result.code_postal;
-                        document.getElementById('id_ville').value = result.ville;
-                        document.getElementById('id_pays').value = result.pays || 'Belgique';
-                        document.getElementById('id_n_carte').value = result.n_carte;
-                    } else {
-                        alert('Erreur lors de la lecture de la carte eID.');
-                    }
-                })
-                .catch(error => {
-                    console.error('Erreur:', error);
-                    alert('Une erreur est survenue lors de la communication avec le serveur.');
-                });
-            } else {
-                alert('Impossible de lire la carte eID.');
-            }
-        });
-    }
-    
-    // Fonction pour obtenir le cookie CSRF
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            let cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                let cookie = cookies[i].trim();
-                // Vérifier que ce cookie commence par le nom recherché
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-    </script>
