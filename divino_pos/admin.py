@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django import forms
 from django.contrib.admin.widgets import AdminDateWidget
-from .models import Product, Client, Transaction, TransactionItem, Return
+from .models import Product, Client, Transaction, TransactionItem, Return, PaymentDetail
 from django.db.models import Sum
 from decimal import Decimal
 
@@ -27,10 +27,14 @@ class ClientAdminForm(forms.ModelForm):
 class TransactionItemInline(admin.TabularInline):
     model = TransactionItem
     extra = 0
-    readonly_fields = ('product', 'quantity', 'price', 'reduction', 'returned_quantity', 'points_gagnes')
+    readonly_fields = ('product', 'quantity', 'original_price' , 'price', 'reduction', 'returned_quantity', 'points_gagnes')
     can_delete = False
     show_change_link = True
-    fields = ('product', 'quantity', 'price', 'reduction', 'returned_quantity', 'points_gagnes')
+    fields = ('product', 'quantity', 'original_price' , 'price', 'reduction', 'returned_quantity', 'points_gagnes')
+
+class PaymentDetailInline(admin.TabularInline):
+    model = PaymentDetail
+    extra = 0  # Pas de formulaires supplémentaires par défaut
 
 # Administration du modèle Client
 class ClientAdmin(admin.ModelAdmin):
@@ -62,15 +66,19 @@ class ProductAdmin(admin.ModelAdmin):
 
 # Administration du modèle Transaction
 class TransactionAdmin(admin.ModelAdmin):
-    list_display = ('uuid', 'client', 'total_price', 'total_reduction', 'points_applied', 'credit_applied', 'date')
+    list_display = ('uuid', 'client', 'total_price', 'total_reduction', 'points_applied', 'credit_applied', 'get_payment_methods', 'date')
     list_filter = ('date', 'client')
     search_fields = ('client__prenom', 'client__nom', 'client__n_carte')
     date_hierarchy = 'date'
     ordering = ('-date',)
     readonly_fields = ('total_price', 'total_reduction', 'points_applied', 'credit_applied', 'date', 'total_items')
-    list_select_related = ('client',)  # Optimisation des requêtes
+    list_select_related = ('client',)
     list_per_page = 20
-    inlines = [TransactionItemInline]  # Utiliser l'inline pour afficher les détails des éléments de la transaction
+    inlines = [TransactionItemInline, PaymentDetailInline]  # Ajoutez PaymentDetailInline ici
+
+    def get_payment_methods(self, obj):
+        return ', '.join(obj.payment_methods_used)
+    get_payment_methods.short_description = 'Méthodes de Paiement'
 
 # Enregistrement des modèles dans l'admin
 admin.site.register(Client, ClientAdmin)

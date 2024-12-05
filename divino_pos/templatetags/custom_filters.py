@@ -20,3 +20,15 @@ def mul(value, arg):
         return float(value) * float(arg)
     except (ValueError, TypeError):
         return ''
+
+@register.filter
+def replace(value, arg):
+    old, new = arg.split(',')
+    return value.replace(old, new)
+
+@register.filter
+def mul(value, arg):
+    try:
+        return float(value) * float(arg)
+    except (ValueError, TypeError):
+        return None

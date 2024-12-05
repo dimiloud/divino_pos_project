@@ -76,7 +76,7 @@
 
     <!-- Détails de la transaction -->
     <div class="transaction-details">
-        <table width="100%">
+        <table width="100%"> 
             <tr>
                 <th>Date :</th>
                 <td>{{ transaction_date }}</td>
@@ -86,8 +86,14 @@
                 <td>{{ client_firstname }} {{ client_lastname }}</td> <!-- Afficher prénom et nom -->
             </tr>
             <tr>
-                <th>Mode de paiement :</th>
-                <td>{{ mode_paiement }}</td>
+                <th>Mode(s) de paiement :</th>
+                <td>
+                    {% for payment in transaction.payments.all %}
+                        {% if payment.amount > 0 %}
+                            - {{ payment.method|capfirst }} : {{ payment.amount|floatformat:2 }} €<br>
+                        {% endif %}
+                    {% endfor %}
+                </td>
             </tr>
         </table>
     </div>
@@ -109,9 +115,9 @@
                 <tr>
                     <td>{{ item.item.product.nom_article }}</td> <!-- Nom du produit via la ForeignKey product -->
                     <td>{{ item.item.quantity }}</td> <!-- Quantité achetée -->
-                    <td>{{ item.item.price|floatformat:2 }} €</td> <!-- Prix sans réduction -->
+                    <td>{{ item.item.original_price|floatformat:2 }} €</td> <!-- Prix sans réduction -->
                     <td>{{ item.item.reduction|floatformat:2 }} €</td> <!-- Montant de la réduction -->
-                    <td>{{ item.total|floatformat:2 }} €</td> <!-- Total par article après réduction -->
+                    <td>{{ item.item.price|floatformat:2 }} €</td> <!-- Total par article après réduction -->
                 </tr>
                 {% endfor %}
             </tbody>
@@ -123,13 +129,9 @@
         <h3>Détails de la Transaction</h3>
         
         {% if transaction.total_price|add:transaction.total_reduction > 0 %}
-            <p><strong>Total : </strong>{{ transaction.total_price|add:transaction.total_reduction }} €</p>
+            <p><strong>Total : </strong>{{ transaction.total_brut }} €</p>
         {% endif %}
-        
-        {% if transaction.total_reduction > 0 %}
-            <p><strong>Total des Réductions : </strong>{{ transaction.total_reduction }} €</p>
-        {% endif %}
-        
+
         {% if transaction.points_applied > 0 %}
             <p><strong>Points Appliqués : </strong>{{ transaction.points_applied }} €</p>
         {% endif %}
@@ -137,12 +139,16 @@
         {% if transaction.credit_applied > 0 %}
             <p><strong>Crédit Appliqué : </strong>{{ transaction.credit_applied }} €</p>
         {% endif %}
-        
+
+        {% if transaction.total_reduction > 0 %}
+            <p><strong>Total des Réductions : </strong>{{ transaction.total_reduction }} €</p>
+        {% endif %}
+
+        <h3><p><strong>Total à payer : </strong>{{ transaction.total_price }} €</p></h3>
+
         {% if transaction.points_gagnes > 0 %}
             <p><strong>Points de Fidélité Gagnés : </strong>{{ transaction.points_gagnes }} points</p>
         {% endif %}
-        
-        <h3><p><strong>Total à payer : </strong>{{ transaction.total_price }} €</p></h3>
     </div>
     
     <!-- Pied de page avec message et remerciements -->

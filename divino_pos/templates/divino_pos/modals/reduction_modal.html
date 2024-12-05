@@ -16,18 +16,6 @@
                     {% csrf_token %}
                     <input type="hidden" id="code_ean_input" name="code_ean">
                     
-                    <!-- Informations sur l'article -->
-                    <div class="card bg-light mb-4">
-                        <div class="card-body">
-                            <h6 class="card-title">Article sélectionné</h6>
-                            <div id="selectedItemInfo">
-                                <p class="mb-1">Nom: <span id="itemName">-</span></p>
-                                <p class="mb-1">Prix original: <span id="itemOriginalPrice">-</span></p>
-                                <p class="mb-0">Quantité: <span id="itemQuantity">-</span></p>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Sélection du type de réduction -->
                     <div class="mb-4">
                         <label class="form-label">Type de réduction</label>
@@ -80,30 +68,6 @@
                         </div>
                     </div>
 
-                    <!-- Aperçu de la réduction -->
-                    <div class="card bg-light">
-                        <div class="card-body">
-                            <h6 class="card-title">Aperçu de la réduction</h6>
-                            <div class="d-flex justify-content-between mb-2">
-                                <span>Prix original unitaire</span>
-                                <span id="previewOriginalPrice">0.00 €</span>
-                            </div>
-                            <div class="d-flex justify-content-between mb-2">
-                                <span>Réduction unitaire</span>
-                                <span class="text-danger" id="previewDiscount">-0.00 €</span>
-                            </div>
-                            <div class="d-flex justify-content-between mb-2">
-                                <span>Nouveau prix unitaire</span>
-                                <span class="text-success" id="previewNewPrice">0.00 €</span>
-                            </div>
-                            <hr>
-                            <div class="d-flex justify-content-between">
-                                <strong>Total pour {{ item.quantite }} article(s)</strong>
-                                <strong id="previewTotal">0.00 €</strong>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Message d'erreur -->
                     <div id="reductionError" class="alert alert-danger mt-3 d-none"></div>
                 </form>
@@ -131,8 +95,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const percentageDiv = document.getElementById('percentageInput');
     const amountDiv = document.getElementById('amountInput');
 
-    let selectedItem = null;
-
     // Fonction pour mettre à jour l'affichage du type de réduction
     function updateReductionType() {
         const reductionType = document.querySelector('input[name="reduction_type"]:checked').value;
@@ -147,44 +109,6 @@ document.addEventListener('DOMContentLoaded', function() {
             percentageInput.required = false;
             amountInput.required = true;
         }
-        updatePreview();
-    }
-
-    // Fonction pour mettre à jour l'aperçu
-    function updatePreview() {
-        if (!selectedItem) return;
-
-        const originalPrice = parseFloat(selectedItem.prix_original);
-        const quantity = parseInt(selectedItem.quantite);
-        let reduction = 0;
-        let newPrice = originalPrice;
-
-        const reductionType = document.querySelector('input[name="reduction_type"]:checked').value;
-        if (reductionType === 'percent') {
-            const percentage = parseFloat(percentageInput.value) || 0;
-            if (percentage < 0 || percentage > 100) {
-                showError('Le pourcentage doit être compris entre 0 et 100');
-                return;
-            }
-            reduction = originalPrice * (percentage / 100);
-        } else {
-            reduction = parseFloat(amountInput.value) || 0;
-            if (reduction < 0 || reduction > originalPrice) {
-                showError('La réduction ne peut pas dépasser le prix original');
-                return;
-            }
-        }
-
-        newPrice = originalPrice - reduction;
-        const total = newPrice * quantity;
-
-        // Mise à jour de l'aperçu
-        document.getElementById('previewOriginalPrice').textContent = `${originalPrice.toFixed(2)} €`;
-        document.getElementById('previewDiscount').textContent = `-${reduction.toFixed(2)} €`;
-        document.getElementById('previewNewPrice').textContent = `${newPrice.toFixed(2)} €`;
-        document.getElementById('previewTotal').textContent = `${total.toFixed(2)} €`;
-
-        hideError();
     }
 
     // Fonction pour afficher une erreur
@@ -203,10 +127,6 @@ document.addEventListener('DOMContentLoaded', function() {
         input.addEventListener('change', updateReductionType);
     });
 
-    [percentageInput, amountInput].forEach(input => {
-        input.addEventListener('input', updatePreview);
-    });
-
     // Validation du formulaire
     form.addEventListener('submit', function(event) {
         const reductionType = document.querySelector('input[name="reduction_type"]:checked').value;
@@ -215,14 +135,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (reductionType === 'percent') {
             const percentage = parseFloat(percentageInput.value);
-            if (isNaN(percentage) || percentage < 0 || percentage > 100) {
+            if (isNaN(percentage) || percentage <= 0 || percentage > 100) {
                 errorMessage = 'Veuillez entrer un pourcentage valide entre 0 et 100';
                 isValid = false;
             }
         } else {
             const amount = parseFloat(amountInput.value);
-            if (isNaN(amount) || amount < 0 || amount > parseFloat(selectedItem.prix_original)) {
-                errorMessage = 'Veuillez entrer un montant valide';
+            if (isNaN(amount) || amount <= 0) {
+                errorMessage = 'Veuillez entrer un montant valide supérieur à 0';
                 isValid = false;
             }
         }
@@ -230,6 +150,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!isValid) {
             event.preventDefault();
             showError(errorMessage);
+        } else {
+            hideError();
         }
     });
 
@@ -239,14 +161,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const codeEan = button.getAttribute('data-code-ean');
         document.getElementById('code_ean_input').value = codeEan;
 
-        // Récupérer les informations de l'article
-        selectedItem = getArticleFromCart(codeEan);
-        if (selectedItem) {
-            document.getElementById('itemName').textContent = selectedItem.nom;
-            document.getElementById('itemOriginalPrice').textContent = `${selectedItem.prix_original} €`;
-            document.getElementById('itemQuantity').textContent = selectedItem.quantite;
-        }
-
         // Réinitialiser le formulaire
         form.reset();
         hideError();
@@ -254,16 +168,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Focus sur le champ actif
         setTimeout(() => {
-            document.querySelector('input[name="reduction_type"]:checked').value === 'percent' 
-                ? percentageInput.focus() 
-                : amountInput.focus();
+            if (document.querySelector('input[name="reduction_type"]:checked').value === 'percent') {
+                percentageInput.focus();
+            } else {
+                amountInput.focus();
+            }
         }, 500);
     });
 });
-
-// Fonction pour récupérer les informations d'un article du panier
-function getArticleFromCart(codeEan) {
-    const panier = {{ panier|safe|default:'{}' }};
-    return panier[codeEan];
-}
 </script>

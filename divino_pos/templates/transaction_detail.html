@@ -38,17 +38,27 @@
             <h4>Informations sur le Client</h4>
             <p><strong>Nom :</strong> {{ transaction.client.prenom }} {{ transaction.client.nom }}</p>
             <p><strong>Email :</strong> {{ transaction.client.email }}</p>
-            <p><strong>Points Appliqués :</strong> {{ transaction.points_applied|floatformat:2 }} €</p>
-            <p><strong>Points de Fidélité gagnés :</strong> {{ transaction.client.fidelity_points|floatformat:2 }}</p>
-            
+            <p><strong>Points Appliqués :</strong> {{ points_applied|floatformat:2 }} points</p>
+            <p><strong>Points de Fidélité gagnés :</strong> 
+                {% if transaction.points_gagnes > 0 %}
+                    {{ transaction.points_gagnes|floatformat:2 }} points
+                {% else %}
+                    Aucun point gagné
+                {% endif %}
+            </p>
         </div>
+        
         <div class="col-md-6">
             <h4>Informations sur la Transaction</h4>
             <p><strong>Date de la Transaction :</strong> {{ transaction.date|date:"d/m/Y H:i" }}</p>
             <p><strong>Total des Réductions :</strong> {{ transaction.total_reduction|floatformat:2 }} €</p>
-            <p><strong>Crédit Appliqué :</strong> {{ transaction.credit_applied|floatformat:2 }} €</p>
-            
-            <p><strong>Mode de Paiement :</strong> {{ transaction.mode_paiement }}</p>
+            <p><strong>Mode de Paiement :</strong>
+                {% for payment in transaction.payments.all %}
+                    {% if payment.amount > 0 %}
+                        {{ payment.method|capfirst }} : {{ payment.amount|floatformat:2 }} €<br>
+                    {% endif %}
+                {% endfor %}
+           </p>
         </div>
     </div>
     <hr>
@@ -73,9 +83,9 @@
                     <td>{{ forloop.counter }}</td>
                     <td>{{ entry.item.product.nom_article }}</td>
                     <td>{{ entry.item.quantity }}</td>
-                    <td>{{ entry.item.price|floatformat:2 }}</td>
+                    <td>{{ entry.item.original_price|floatformat:2 }}</td>
                     <td>{{ entry.item.reduction|floatformat:2 }}</td>
-                    <td>{{ entry.total_item|floatformat:2 }}</td>
+                    <td>{{ entry.item.price|floatformat:2 }}</td>
                     <td>
                         {% if entry.returned_quantity > 0 %}
                             <span class="badge bg-danger">{{ entry.returned_quantity }} retourné(s)</span>
@@ -96,9 +106,10 @@
             </tbody>
         </table>
     </div>
-    <p><strong>Total à Payer :</strong> {{ transaction.total_price|floatformat:2 }} €</p>
+    <p><strong>Total à Payer :</strong> {{ total_adjusted|floatformat:2 }} €</p>
     <hr>
-    <a href="{% url 'sales_history' %}" class="btn btn-primary mt-3">Retour à l'Historique des vente</a>
+    <a href="{% url 'sales_history' %}" class="btn btn-primary mt-3">Retour à l'Historique des ventes</a>
     <a href="{% url 'pos' %}" class="btn btn-secondary mt-3">Retour au POS</a>
 </div>
+
 {% endblock %}

@@ -1,34 +1,29 @@
-<!-- templates/sales_history.html -->
-
 {% extends 'base.html' %}
 
 {% block content %}
 <style>
     table {
-        border-collapse: separate; /* Nécessaire pour que border-radius fonctionne */
+        border-collapse: separate;
         border-spacing: 0;
         width: 100%;
         border: 1px solid #ddd;
-        border-radius: 10px; /* Ajustez la valeur pour changer le rayon des coins */
-        overflow: hidden; /* Pour que le contenu respecte les coins arrondis */
+        border-radius: 10px;
+        overflow: hidden;
     }
-    
     thead th {
         background-color: #f2f2f2;
         color: #333;
         padding: 12px;
         text-align: left;
     }
-    
     tbody td {
         padding: 12px;
         border-bottom: 1px solid #ddd;
     }
-    
     tbody tr:last-child td {
-        border-bottom: none; /* Retire la bordure de la dernière ligne */
+        border-bottom: none;
     }
-    </style>
+</style>
 <div class="container-fluid">
     <h2 class="mb-4 text-center">Historique des Ventes</h2>
 
@@ -54,55 +49,64 @@
         </div>
         <div class="card-body">
             {% if transactions_with_items %}
-                <table class="table table-striped">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>UUID</th>
-                            <th>Date</th>
-                            <th>Client</th>
-                            <th>Total</th>
-                            <th>Points Appliqués</th>
-                            <th>Réduction</th>
-                            <th>Mode de Paiement</th>
-                            <th>Points Gagnés</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for transaction in transactions_with_items %}
-                        <tr>
-                            <td class="small">{{ transaction.pk }}</td>
-                        </td>                        
-                        <td>{{ transaction.date|date:'d/m/Y H:i' }}</td>
-                            <td>
-                                {% if transaction.client %}
-                                    {{ transaction.client.nom }} {{ transaction.client.prenom }}
-                                {% else %}
-                                    Anonyme
+            <table class="table table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>UUID</th>
+                        <th>Date</th>
+                        <th>Client</th>
+                        <th>Total</th>
+                        <th>Réduction</th>
+                        <th>Points Appliqués</th>
+                        <th>Crédit Appliqué</th>
+                        <th>Mode de Paiement</th>
+                        <th>Points Gagnés</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for data in transactions_with_items %}
+                    <tr>
+                        <td class="small">{{ data.transaction.pk }}</td>
+                        <td>{{ data.transaction.date|date:'d/m/Y H:i' }}</td>
+                        <td>
+                            {% if data.transaction.client %}
+                                {{ data.transaction.client.nom }} {{ data.transaction.client.prenom }}
+                            {% else %}
+                                Anonyme
+                            {% endif %}
+                        </td>
+                        <td>{{ data.total_before_discounts|floatformat:2 }} €</td>
+                        <td>{{ data.promotion_discounts|floatformat:2 }} €</td>
+                        <td>{{ data.points_applied|floatformat:2 }} points</td>
+                        <td>{{ data.credit_applied|floatformat:2 }} €</td> 
+                        <td>
+                            {% for payment in data.transaction.payments.all %}
+                                {% if payment.amount > 0 %}
+                                    {% if payment.method == 'cash' %}
+                                        <span class="badge bg-success">{{ payment.method|capfirst }} : {{ payment.amount|floatformat:2 }} €</span>
+                                    {% elif payment.method == 'card' %}
+                                        <span class="badge bg-primary">{{ payment.method|capfirst }} : {{ payment.amount|floatformat:2 }} €</span>
+                                    {% elif payment.method == 'gift' %}
+                                        <span class="badge bg-warning">{{ payment.method|capfirst }} : {{ payment.amount|floatformat:2 }} €</span>
+                                    {% elif payment.method == 'voucher' %}
+                                        <span class="badge bg-info">{{ payment.method|capfirst }} : {{ payment.amount|floatformat:2 }} €</span>
+                                    {% elif payment.method == 'credit' %}
+                                        <span class="badge bg-info">{{ payment.method|capfirst }} : {{ payment.amount|floatformat:2 }} €</span>
+                                    {% endif %}
                                 {% endif %}
-                            </td>
-                            <td>{{ transaction.total_price }} €</td>
-                            <td>{{ transaction.points_applied }} €</td>
-                            <td>{{ transaction.total_reduction }} €</td>
-                            <td>
-                                {% if transaction.mode_paiement == 'cash' %}
-                                    <span class="badge bg-secondary text-white">Cash</span>
-                                {% elif transaction.mode_paiement == 'carte' %}
-                                    <span class="badge bg-primary text-white">Carte</span>
-                                {% else %}
-                                    {{ transaction.mode_paiement|capfirst }}
-                                {% endif %}
-                            </td>                        
-                            <td>{{ transaction.points_gagnes }} points</td>
-                            <td>
-                                <a href="{% url 'transaction_detail' transaction_pk=transaction.pk %}" class="btn btn-sm btn-info">Détails</a>
-                                <a href="{% url 'generate_ticket' transaction_pk=transaction.pk %}?source=sales_history" class="btn btn-sm btn-success">Imprimer Ticket</a>
-                                <a href="{% url 'manage_return' transaction_pk=transaction.pk %}" class="btn btn-sm btn-danger">Gérer les Retours</a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                            {% endfor %}
+                        </td>                       
+                        <td>{{ data.transaction.points_gagnes|floatformat:2 }} points</td>
+                        <td>
+                            <a href="{% url 'transaction_detail' transaction_pk=data.transaction.pk %}" class="btn btn-sm btn-info">Détails</a>
+                            <a href="{% url 'generate_ticket' transaction_pk=data.transaction.pk %}?source=sales_history" class="btn btn-sm btn-success">Imprimer Ticket</a>
+                            <a href="{% url 'manage_return' transaction_pk=data.transaction.pk %}" class="btn btn-sm btn-danger">Gérer les Retours</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>            
             {% else %}
                 <p>Aucune transaction trouvée pour cette période.</p>
             {% endif %}
@@ -110,5 +114,5 @@
     </div>
 </div>
 
-
 {% endblock %}
+

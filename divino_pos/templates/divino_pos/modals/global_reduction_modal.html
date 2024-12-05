@@ -96,9 +96,9 @@ document.addEventListener('DOMContentLoaded', function() {
         errorDiv.classList.add('d-none');
         
         // Calculs
-        const discountAmount = (totalBeforeDiscount * percentage / 100).toFixed(2);
-        const totalAfterDiscount = (totalBeforeDiscount - discountAmount).toFixed(2);
-
+        const discountAmount = Math.round((totalBeforeDiscount * percentage / 100) * 100) / 100;
+        const totalAfterDiscount = Math.round((totalBeforeDiscount - discountAmount) * 100) / 100;
+        
         // Mise à jour de l'aperçu
         document.getElementById('discountAmount').textContent = `-${discountAmount} €`;
         document.getElementById('totalAfterDiscount').textContent = `${totalAfterDiscount} €`;

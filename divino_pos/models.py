@@ -20,7 +20,6 @@ class Product(models.Model):
     tailles = models.CharField(max_length=100, blank=True, null=True)
     quantite = models.IntegerField(default=0)
     
-
     def __str__(self):
         return self.nom_article
 
@@ -157,6 +156,10 @@ class Transaction(models.Model):
         max_digits=10, decimal_places=2, default=Decimal('0.00'),
         help_text="Total des réductions appliquées."
     )
+    global_discount_percentage = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal('0.00'),
+        help_text="Pourcentage de réduction globale appliquée."
+    )
     total_items = models.PositiveIntegerField(default=0)
     credit_applied = models.DecimalField(
         max_digits=10, decimal_places=2, default=Decimal('0.00'),
@@ -171,11 +174,29 @@ class Transaction(models.Model):
         help_text="Points gagnés lors de cette transaction."
     )
     date = models.DateTimeField(default=timezone.now)
-    # Supprimer le champ 'mode_paiement' car nous allons utiliser 'PaymentDetail'
+    
+    MODE_PAIEMENT_CHOICES = [
+        ('cash', 'Espèces'),
+        ('card', 'Carte bancaire'),
+        ('gift', 'Chèque cadeau'),
+        ('voucher', 'Bon cadeau'),
+        ('transfer', 'Virement'),
+        ('credit', 'Crédit'),
+        ('multiple', 'Multiple'),
+    # Ajoutez d'autres méthodes de paiement si nécessaire
+    ]
+    mode_paiement = models.CharField(
+        max_length=50,
+        choices=MODE_PAIEMENT_CHOICES,
+        help_text="Méthode de paiement utilisée pour la transaction.",
+        null=True,
+        blank=True,  # Permet de laisser le champ vide dans les formulaires
+    )
 
     def __str__(self):
         client_name = f"{self.client.prenom} {self.client.nom}" if self.client else "Anonyme"
-        return f"Transaction {self.numero_transaction} - Client: {client_name}"
+        payment_methods = ', '.join(self.payment_methods_used) if self.payment_methods_used else "Aucun paiement"
+        return f"Transaction {self.numero_transaction} - Client: {client_name} - Paiement: {payment_methods}"
 
     def save(self, *args, **kwargs):
         if not self.numero_transaction:
@@ -191,14 +212,29 @@ class Transaction(models.Model):
             if not Transaction.objects.filter(numero_transaction=number).exists():
                 return number
 
+    @property
+    def total_brut(self):
+        """
+        Calcule le total brut des articles avant réductions et crédits.
+        """
+        return sum(item.original_price * item.quantity for item in self.items.all())
+
+    @property
+    def total_a_payer(self):
+        """
+        Calcule le total réel à payer après réductions et crédits.
+        """
+        return self.total_brut - self.total_reduction
+
     def calculate_totals(self):
         """
         Calcule et met à jour les totaux de la transaction en fonction des articles associés.
         """
         items = self.items.all()
         self.total_price = sum(
-            (item.price - item.reduction) * item.quantity for item in items
-        ) - self.credit_applied - self.points_applied
+            (item.price * item.quantity) - (item.reduction * item.quantity)
+            for item in items
+        )
         self.total_reduction = sum(
             item.reduction * item.quantity for item in items
         ) + self.credit_applied + self.points_applied
@@ -212,7 +248,6 @@ class Transaction(models.Model):
         total_returned_amount = self.items.aggregate(
             total=Sum('returns__refund_amount')
         )['total'] or Decimal('0.00')
-
         return self.total_price - total_returned_amount
 
     def clean(self):
@@ -223,16 +258,22 @@ class Transaction(models.Model):
             raise ValidationError("Le total de la transaction ne peut pas être négatif.")
         if self.total_reduction > self.total_price:
             raise ValidationError("Les réductions ne peuvent pas dépasser le total de la transaction.")
+    
+    @property
+    def payment_methods_used(self):
+        return [payment.method for payment in self.payments.all()]
 
     class Meta:
         verbose_name = "Transaction"
         verbose_name_plural = "Transactions"
+
 class TransactionItem(models.Model):
     transaction = models.ForeignKey(
         Transaction, related_name='items', on_delete=models.CASCADE
     )
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
+    original_price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     price = models.DecimalField(
         max_digits=10, decimal_places=2,
         help_text="Prix unitaire de l'article."
@@ -257,7 +298,9 @@ class TransactionItem(models.Model):
     )
 
     def __str__(self):
-        return f"{self.quantity} x {self.product.nom_article}"
+        client = self.transaction.client
+        client_name = f"{client.prenom} {client.nom}" if client else "Anonyme"
+        return f"{self.quantity} x {self.product.nom_article} - Client: {client_name}"
 
     def is_on_sale(self):
         """
@@ -291,11 +334,23 @@ class TransactionItem(models.Model):
         """
         total_quantity = self.quantity - self.returned_quantity
         return (self.price - self.reduction) * total_quantity
+    
+    def get_total_brut(self):
+        """
+        Calcule le total brut de cet article avant toute réduction.
+        """
+        return self.original_price * self.quantity
 
+    def get_total_price_after_reduction(self):
+        """
+        Calcule le total après réduction pour cet article.
+        """
+        return (self.price - self.reduction) * self.quantity
+    
     class Meta:
         verbose_name = "Article de Transaction"
         verbose_name_plural = "Articles de Transaction"
-        
+
 class PaymentDetail(models.Model):
     transaction = models.ForeignKey(
         Transaction, related_name='payments', on_delete=models.CASCADE
@@ -333,7 +388,6 @@ class Return(models.Model):
         verbose_name = "Retour"
         verbose_name_plural = "Retours"
 
-
 class Voucher(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='vouchers')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -347,7 +401,6 @@ class Voucher(models.Model):
     class Meta:
         verbose_name = "Bon d'Achat"
         verbose_name_plural = "Bons d'Achat"
-
 
 # Signaux pour gérer la mise à jour des stocks lors des transactions
 @receiver(pre_save, sender=TransactionItem)
@@ -367,7 +420,6 @@ def update_stock_on_transaction_item_save(sender, instance, **kwargs):
 
     # Ajuster le stock du produit
     instance.product.adjust_stock(-quantity_diff)
-
 
 @receiver(post_delete, sender=TransactionItem)
 def update_stock_on_transaction_item_delete(sender, instance, **kwargs):

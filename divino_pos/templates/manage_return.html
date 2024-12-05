@@ -1,16 +1,15 @@
-<!-- manage_return.html -->
 {% extends 'base.html' %}
 {% load custom_filters %}
 
 {% block content %}
 <style>
     table {
-        border-collapse: separate; /* Nécessaire pour que border-radius fonctionne */
+        border-collapse: separate;
         border-spacing: 0;
         width: 100%;
         border: 1px solid #ddd;
-        border-radius: 10px; /* Ajustez la valeur pour changer le rayon des coins */
-        overflow: hidden; /* Pour que le contenu respecte les coins arrondis */
+        border-radius: 10px;
+        overflow: hidden;
     }
     
     thead th {
@@ -26,7 +25,7 @@
     }
     
     tbody tr:last-child td {
-        border-bottom: none; /* Retire la bordure de la dernière ligne */
+        border-bottom: none;
     }
 </style>
 
@@ -45,35 +44,48 @@
         {% csrf_token %}
         <div class="card-body">
             <table class="table table-striped">
-                <thead class="table-dark"> 
+                <thead class="table-dark">
                     <tr>
                         <th>Article</th>
                         <th>Quantité achetée</th>
+                        <th>Quantité retournée</th>
                         <th>Quantité à retourner</th>
                         <th>Prix unitaire (€)</th>
                         <th>Total (€)</th>
                         <th>Promotion</th>
+                        <th>État</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in items %}
+                    {% for data in items_with_status %}
                     <tr>
-                        <td>{{ item.product.nom_article }}</td>
-                        <td>{{ item.quantity }}</td>
+                        <td>{{ data.item.product.nom_article }}</td>
+                        <td>{{ data.item.quantity }}</td>
+                        <td>{{ data.item.returned_quantity }}</td>
                         <td>
-                            {% if item.promotion_applied %}
-                                <span class="text-danger">Non retournable (promotion appliquée)</span>
+                            <input 
+                                type="number" 
+                                name="quantity_returned_{{ data.item.id }}" 
+                                min="0" 
+                                max="{{ data.max_returnable_quantity }}" 
+                                class="form-control" 
+                                value="0" 
+                                {% if data.is_return_impossible %} disabled {% endif %}>
+                        </td>
+                        <td>{{ data.item.price|floatformat:2 }} €</td>
+                        <td>{{ data.item.price|floatformat:2 }} € x {{ data.item.quantity }} = {{ data.item.price|mul:data.item.quantity|floatformat:2 }} €</td>
+                        <td>
+                            {% if data.is_promotion_applied %}
+                            <span class="badge bg-danger">Oui</span>
                             {% else %}
-                            <input type="number" name="quantity_returned_{{ item.id }}" min="0" max="{{ item.quantity|subtract:item.returned_quantity }}" class="form-control" value="0">
+                            <span class="badge bg-success">Non</span>
                             {% endif %}
                         </td>
-                        <td>{{ item.price|floatformat:2 }} €</td>
-                        <td>{{ item.price|floatformat:2 }} € x {{ item.quantity }} = {{ item.price|mul:item.quantity|floatformat:2 }} €</td>
                         <td>
-                            {% if item.promotion_applied %}
-                                <span class="badge bg-danger">Oui</span>
+                            {% if data.is_return_impossible %}
+                            <span class="badge bg-danger">Retour impossible</span>
                             {% else %}
-                                <span class="badge bg-success">Non</span>
+                            <span class="badge bg-success">Retour possible</span>
                             {% endif %}
                         </td>
                     </tr>
@@ -81,8 +93,7 @@
                 </tbody>
             </table>
             <button type="submit" class="btn btn-success">Valider les Retours</button>
-        </div>
-    </form>
-    <a href="{% url 'sales_history' %}" class="btn btn-primary mt-3">Retour à l'Historique des ventes</a>
-</div>
+            <a href="{% url 'sales_history' %}" class="btn btn-primary">Retour à l'Historique des ventes</a>
+            
 {% endblock %}
+

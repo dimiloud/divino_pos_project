@@ -1,16 +1,15 @@
-# -*- coding: utf-8 -*-
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, ROUND_DOWN
 from datetime import datetime, timedelta
 from django.contrib import messages
 from .forms import DiscountForm, StockUpdateForm, ProductForm, ClientCreationForm
-from django.utils.timezone import make_aware
+from django.utils.timezone import make_aware, now
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models.functions import TruncDate
-from django.db.models import Q, Sum, Count, Max
+from django.db.models import Q, Sum, Count, Max, F
 from django.http import HttpResponseRedirect, HttpResponse, Http404, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.template.loader import get_template
@@ -24,9 +23,9 @@ import pandas as pd
 import requests
 import json
 from .forms import ReturnForm
-from .models import (
-    Client, Product, Transaction, TransactionItem, Return, PaymentDetail
-)
+from .models import Client, Product, Transaction, TransactionItem, Return, PaymentDetail
+
+
 
 # Constantes
 ITEMS_PER_PAGE = 10
@@ -506,16 +505,13 @@ def remove_from_cart(request, code_ean):
         messages.success(request, "Article retiré du panier.")
     return redirect('pos')
 
+
 @login_required
 @transaction.atomic
 def finalize_sale(request):
-    """
-    Finalise la vente en créant une transaction.
-    """
     panier = request.session.get('panier', {})
     client_id = request.session.get('selected_client_id', None)
     points_appliques = Decimal(request.session.get('points_appliques', '0.00'))
-    credit_applique = Decimal(request.session.get('credit_applique', '0.00'))
     global_reduction_percentage = Decimal(request.session.get('global_discount_percentage', '0.00'))
 
     if not panier:
@@ -527,27 +523,52 @@ def finalize_sale(request):
         client = get_object_or_404(Client, id=client_id)
 
     if request.method == 'POST':
-        # Récupérer les montants pour chaque méthode de paiement
-        payment_methods = ['cash', 'card', 'gift', 'voucher', 'transfer']
+        payment_methods = ['cash', 'card', 'gift', 'voucher', 'transfer', 'credit']
         payment_details = {}
         total_paid = Decimal('0.00')
 
+        # Traitement des méthodes de paiement
         for method in payment_methods:
-            amount = request.POST.get(method, '0.00')
-            amount = Decimal(amount).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            amount_str = request.POST.get(method, '0.00').replace(',', '.')
+            try:
+                amount = Decimal(amount_str).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            except (InvalidOperation, ValueError):
+                messages.error(request, f"Montant invalide pour la méthode de paiement {method}.")
+                return redirect('pos')
+
             if amount < Decimal('0.00'):
                 messages.error(request, "Les montants de paiement ne peuvent pas être négatifs.")
                 return redirect('pos')
+
             payment_details[method] = amount
             total_paid += amount
 
-        try:
-            total_vente = Decimal('0.00')
-            total_reduction = Decimal('0.00')
-            total_items = 0
+        # Mettre à jour 'credit_applique' avec la valeur du paiement
+        credit_applique = payment_details.get('credit', Decimal('0.00'))
 
-            # Déterminer si une réduction globale est appliquée
-            reduction_globale_appliquee = global_reduction_percentage > Decimal('0.00')
+        # Vérification du crédit disponible pour le client
+        if credit_applique > Decimal('0.00') and client:
+            if credit_applique > client.credit:
+                messages.error(request, "Le montant de crédit utilisé dépasse le crédit disponible.")
+                return redirect('pos')
+
+        try:
+            total_brut = Decimal('0.00')
+            total_item_reductions = Decimal('0.00')
+            total_items = 0
+            points_gagnes_total = Decimal('0.00')
+
+            # Création de la transaction (transaction vide pour le moment)
+            new_transaction = Transaction.objects.create(
+                client=client,
+                total_price=Decimal('0.00'),  # Sera mis à jour après le traitement des articles
+                total_reduction=Decimal('0.00'),  # Sera mis à jour après le traitement
+                total_items=0,
+                points_applied=points_appliques,
+                credit_applied=credit_applique,
+                points_gagnes=Decimal('0.00'),  # Sera mis à jour après le traitement
+                date=timezone.now(),
+            )
 
             # Traitement des articles du panier
             for code_ean, item in panier.items():
@@ -561,105 +582,95 @@ def finalize_sale(request):
                 prix_vente = Decimal(item['prix_vente']).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 montant_reduction = (prix_original - prix_vente).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
-                total_item_original = (prix_original * quantite_demandee).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                total_item_brut = (prix_original * quantite_demandee).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 total_item_vente = (prix_vente * quantite_demandee).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 total_item_reduction = (montant_reduction * quantite_demandee).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
-                total_vente += total_item_original
-                total_reduction += total_item_reduction
+                total_brut += total_item_brut
+                total_item_reductions += total_item_reduction
                 total_items += quantite_demandee
 
-            # Application de la réduction globale
-            if reduction_globale_appliquee:
-                subtotal_after_item_reductions = total_vente - total_reduction
-                global_reduction_amount = (subtotal_after_item_reductions * (global_reduction_percentage / Decimal('100'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                total_reduction += global_reduction_amount
+                # Mise à jour du stock du produit
+               # product.quantite -= quantite_demandee
+                #product.save()
 
-            # Calcul du total à payer après réductions
-            subtotal_after_reductions = total_vente - total_reduction
-            total_a_payer = (subtotal_after_reductions - credit_applique - points_appliques).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-
-            if total_a_payer < Decimal('0.00'):
-                total_a_payer = Decimal('0.00')
-
-            # Vérifier si le total payé couvre le total à payer
-            if total_paid < total_a_payer:
-                messages.error(request, "Le montant total payé est insuffisant.")
-                return redirect('pos')
-
-            # Calcul des points de fidélité gagnés (ajustez selon votre logique)
-            points_gagnes_total = Decimal('0.00')
-            if client and total_a_payer > Decimal('0.00') and not reduction_globale_appliquee:
-                points_gagnes_total = (total_a_payer * Decimal('0.05')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                client.fidelity_points += points_gagnes_total
-                client.save()
-
-            # Création de la transaction
-            new_transaction = Transaction.objects.create(
-                client=client,
-                total_price=total_a_payer,
-                total_reduction=total_reduction + credit_applique + points_appliques,
-                total_items=total_items,
-                points_applied=points_appliques,
-                credit_applied=credit_applique,
-                points_gagnes=points_gagnes_total,
-                date=timezone.now()
-            )
-
-            # Enregistrer les détails de paiement
-            for method, amount in payment_details.items():
-                if amount > Decimal('0.00'):
-                    PaymentDetail.objects.create(
-                        transaction=new_transaction,
-                        method=method,
-                        amount=amount
-                    )
-
-            # Mise à jour des articles de la transaction
-            for code_ean, item in panier.items():
-                product = Product.objects.select_for_update().get(code_ean=code_ean)
-                quantite_demandee = int(item['quantite'])
-                prix_vente = Decimal(item['prix_vente']).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                montant_reduction = (Decimal(item['prix_original']) - prix_vente).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                # Calcul des points gagnés pour les articles non soldés
+                points_gagnes_item = Decimal('0.00')
+                if montant_reduction == Decimal('0.00'):
+                    points_gagnes_item = (total_item_vente * Decimal('0.05')).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+                    points_gagnes_total += points_gagnes_item
 
                 # Création de l'élément de transaction
                 TransactionItem.objects.create(
                     transaction=new_transaction,
                     product=product,
                     quantity=quantite_demandee,
+                    original_price=prix_original,
                     price=prix_vente,
                     reduction=montant_reduction,
-                    points_gagnes=Decimal('0.00')  # Vous pouvez ajuster si nécessaire
+                    points_gagnes=points_gagnes_item
                 )
 
-                # Mise à jour du stock
-                product.quantite -= quantite_demandee
-                product.save()
+            # Calcul de la réduction globale
+            subtotal_after_item_reductions = total_brut - total_item_reductions
+            global_reduction_amount = (subtotal_after_item_reductions * (global_reduction_percentage / Decimal('100.00'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
-            # Application du crédit
-            if client and credit_applique > Decimal('0.00'):
-                if credit_applique > client.credit:
-                    # Ajuster le crédit appliqué si le client n'a pas assez de crédit
-                    credit_applique = client.credit
-                client.credit -= credit_applique
+            # Calcul du total des réductions (sans 'credit_applique' car le crédit est un mode de paiement)
+            total_reduction = total_item_reductions + global_reduction_amount + points_appliques
+
+            # Calcul du total à payer
+            total_a_payer = total_brut - total_reduction
+
+            # Vérification que le montant payé est suffisant
+            if total_paid < total_a_payer:
+                messages.error(request, "Le montant total payé est insuffisant.")
+                return redirect('pos')
+            
+            # Calcul du montant restant à payer
+            montant_restant = total_a_payer - total_paid
+            montant_restant = max(Decimal('0.00'), montant_restant)
+
+             # Déterminer les méthodes de paiement utilisées
+            used_payment_methods = [method for method, amount in payment_details.items() if amount > Decimal('0.00')]
+
+            if len(used_payment_methods) == 1:
+                new_transaction.mode_paiement = used_payment_methods[0]
+            else:
+                new_transaction.mode_paiement = 'multiple'
+
+            # Mise à jour de la transaction avec les valeurs finales
+            new_transaction.total_price = total_a_payer.quantize(Decimal('0.01'))
+            new_transaction.total_reduction = total_reduction.quantize(Decimal('0.01'))
+            new_transaction.total_items = total_items
+            new_transaction.points_gagnes = points_gagnes_total.quantize(Decimal('0.01'))
+            new_transaction.total_paid = total_paid.quantize(Decimal('0.01'))
+            new_transaction.amount_due = montant_restant.quantize(Decimal('0.01'))
+            new_transaction.save()
+
+            # Création des détails de paiement
+            for method, amount in payment_details.items():
+                if amount > Decimal('0.00'):
+                    PaymentDetail.objects.create(
+                        transaction=new_transaction,
+                        method=method,
+                        amount=amount,
+                    )
+
+            # Mise à jour du crédit et des points de fidélité du client
+            if client:
+                client.fidelity_points = max(client.fidelity_points - points_appliques + points_gagnes_total, Decimal('0.00'))
+                if credit_applique > Decimal('0.00'):
+                    client.credit = max(client.credit - credit_applique, Decimal('0.00'))
                 client.save()
 
-            # Application des points de fidélité
-            if client and points_appliques > Decimal('0.00'):
-                if points_appliques > client.fidelity_points:
-                    # Ajuster les points appliqués si le client n'a pas assez de points
-                    points_appliques = client.fidelity_points
-                client.fidelity_points -= points_appliques
-                client.save()
-
-            # Réinitialisation des variables de session
+            # Réinitialisation de la session
             request.session['panier'] = {}
             request.session['selected_client_id'] = None
             request.session['points_appliques'] = '0.00'
             request.session['credit_applique'] = '0.00'
             request.session['global_discount_percentage'] = '0.00'
 
-            messages.success(request, f"Vente finalisée avec succès ! Total à payer : {total_a_payer} €. Points gagnés : {points_gagnes_total}.")
+            messages.success(request, f"Vente finalisée ! Total : {total_a_payer.quantize(Decimal('0.01'))} €. Points gagnés : {points_gagnes_total}.")
             return redirect('generate_ticket', transaction_pk=new_transaction.pk)
 
         except ValidationError as ve:
@@ -667,11 +678,11 @@ def finalize_sale(request):
             return redirect('pos')
 
         except Exception as e:
-            messages.error(request, f"Erreur lors de la finalisation de la vente : {str(e)}")
+            messages.error(request, f"Erreur lors de la finalisation : {str(e)}")
             return redirect('pos')
 
-    return render(request, 'finalize_sale.html')
-
+    else:
+        return redirect('pos')
 
 # Fonction pour annuler une vente
 @login_required
@@ -680,18 +691,6 @@ def cancel_sale(request):
     selected_client_id = request.session.get('selected_client_id')
     credit_applique = Decimal(request.session.get('credit_applique', '0.00'))
     points_appliques = Decimal(request.session.get('points_appliques', '0.00'))
-
-    # Restaurer le crédit et les points de fidélité du client
-    if selected_client_id:
-        try:
-            selected_client = Client.objects.get(id=selected_client_id)
-            # Restaurer le crédit
-            selected_client.credit += credit_applique
-            # Restaurer les points de fidélité
-            selected_client.fidelity_points += points_appliques
-            selected_client.save()
-        except Client.DoesNotExist:
-            pass  # Le client n'existe pas, rien à faire
 
     # Réinitialiser le panier et les variables de session
     request.session['panier'] = {}
@@ -930,37 +929,30 @@ def add_transaction(request):
     return render(request, 'add_transaction.html', {'clients': clients, 'products': products})
 
 
-# Vue pour les détails d'une transaction
 @login_required
 def transaction_detail(request, transaction_pk):
     """
-    Affiche les détails d'une transaction spécifique.
-
-    Améliorations apportées :
-    - Ajout du décorateur @login_required.
-    - Optimisation des requêtes avec 'select_related' et 'prefetch_related'.
-    - Calcul du total ajusté en tenant compte des retours.
-
-    Bonnes pratiques Django :
-    - Gestion efficace des relations pour réduire le nombre de requêtes.
+    Affiche les détails d'une transaction spécifique, avec les points gagnés calculés à partir des articles.
     """
-    # Calcul du chiffre d'affaires du jour
-    today = timezone.now().date()
-    total_sales_today = Transaction.objects.filter(date__date=today).aggregate(Sum('total_price'))['total_price__sum'] or 0
-
     transaction = get_object_or_404(Transaction, pk=transaction_pk)
     items = transaction.items.select_related('product').all()
 
     total_adjusted = transaction.total_price
     items_with_returns = []
+    total_points_gagnes = Decimal('0.00')  # Initialiser les points gagnés
 
     for item in items:
-        returned_items = Return.objects.filter(transaction_item=item)
+        # Récupérer les informations sur les retours pour chaque article
+        returned_items = item.returns.all()
         total_returned_quantity = returned_items.aggregate(total=Sum('quantity_returned'))['total'] or 0
         total_returned_amount = returned_items.aggregate(total=Sum('refund_amount'))['total'] or Decimal('0.00')
         points_removed = returned_items.aggregate(total=Sum('points_removed'))['total'] or Decimal('0.00')
 
-        total_item = (item.price - item.reduction) * item.quantity
+        # Ajouter les points gagnés pour cet article
+        total_points_gagnes += item.points_gagnes
+
+        # Calculer le total ajusté pour cet article
+        total_item = item.calculate_adjusted_total()
 
         items_with_returns.append({
             'item': item,
@@ -976,21 +968,29 @@ def transaction_detail(request, transaction_pk):
         'transaction': transaction,
         'items_with_returns': items_with_returns,
         'total_adjusted': total_adjusted,
-        'total_sales_today': total_sales_today,
+        'points_applied': transaction.points_applied,  # Points appliqués
+        'credit_applied': transaction.credit_applied,  # Crédit appliqué
+        'points_gagnes': total_points_gagnes,  # Total des points gagnés
+        'total_sales_today': Transaction.objects.filter(date__date=timezone.now().date())
+                                                .aggregate(Sum('total_price'))['total_price__sum'] or 0,
+        'total_brut': transaction.total_brut,
+        'total_a_payer': transaction.total_a_payer,                                    
     }
 
-    return render(request, 'divino_pos/transaction_detail.html', {'transaction': transaction})
+    return render(request, 'transaction_detail.html', context)
 
 # Vue pour l'historique des ventes
+
 @login_required
 def sales_history_view(request):
     """
     Affiche l'historique des ventes avec possibilité de filtrer par date.
+    Les points de fidélité ne sont accordés qu'aux articles non soldés.
     """
     # Calcul du chiffre d'affaires du jour
     today = timezone.now().date()
-    total_sales_today = Transaction.objects.filter(date__date=today).aggregate(Sum('total_price'))['total_price__sum'] or 0
-    # Récupérer les dates de début et de fin depuis les paramètres GET ou utiliser la date du jour
+    total_sales_today = Transaction.objects.filter(date__date=today).aggregate(Sum('total_price'))['total_price__sum'] or 0   
+
     start_date_str = request.GET.get('start_date')
     end_date_str = request.GET.get('end_date')
 
@@ -998,33 +998,58 @@ def sales_history_view(request):
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
         end_date = datetime.strptime(end_date_str, '%Y-%m-%d') + timedelta(days=1)
     else:
-        # Par défaut, on affiche les ventes du jour
         today = timezone.now().date()
         start_date = datetime.combine(today, datetime.min.time())
         end_date = datetime.combine(today + timedelta(days=1), datetime.min.time())
 
-    # Rendre les dates conscientes du fuseau horaire
+    # Convertir les dates en objets de fuseau horaire conscient
     start_date = make_aware(start_date)
     end_date = make_aware(end_date)
 
-    # Récupérer les transactions dans la plage de dates
-    transactions = Transaction.objects.filter(date__gte=start_date, date__lt=end_date)
+    # Récupérer les transactions dans la plage de dates et les trier par date (descendant par défaut)
+    transactions = Transaction.objects.filter(
+        date__gte=start_date, date__lt=end_date
+    ).prefetch_related('items__product').order_by('-date')  # Trier par ordre décroissant (les plus récentes en premier)
 
-    # Précharger les clients pour optimiser les requêtes
-    transactions = transactions.select_related('client')
+    # Calculs pour chaque transaction
+    transactions_with_calculations = []
+    for transaction in transactions:
+        # Calculer le total avant réductions (prix original * quantité)
+        total_before_discounts = sum(
+            item.product.prix_vente * item.quantity for item in transaction.items.all()
+        )
 
-    # Vérification du nombre de transactions récupérées
-    print(f"Nombre de transactions récupérées : {transactions.count()}")
+        # Calculer les réductions appliquées sur les articles
+        promotion_discounts = sum(
+            item.reduction * item.quantity for item in transaction.items.all()
+        )
 
-    # Calcul du chiffre d'affaires du jour
-    today = timezone.now().date()
-    total_sales_today = Transaction.objects.filter(date__date=today).aggregate(Sum('total_price'))['total_price__sum'] or 0
+        # Calculer les points gagnés uniquement pour les articles non soldés
+        total_points_gagnes = sum(
+            item.points_gagnes
+            for item in transaction.items.all()
+            if item.reduction == Decimal('0.00')  # Pas de réduction = non soldé
+        )
 
+        # Ajouter les données calculées pour chaque transaction
+        transactions_with_calculations.append({
+            'transaction': transaction,
+            'total_brut': transaction.total_brut,  # Appel de la propriété total_brut
+            'total_a_payer': transaction.total_a_payer,
+            'total_before_discounts': total_before_discounts,
+            'promotion_discounts': promotion_discounts,
+            'points_applied': transaction.points_applied,
+            'credit_applied': transaction.credit_applied,
+            'mode_paiement': transaction.mode_paiement,
+            'points_gagnes': total_points_gagnes,
+            
+        })
+
+    # Contexte pour le template
     context = {
-        'transactions_with_items': transactions,
+        'transactions_with_items': transactions_with_calculations,
         'start_date': start_date.date(),
         'end_date': (end_date - timedelta(days=1)).date(),
-        'today': timezone.now().date(),
         'total_sales_today': total_sales_today,
     }
 
@@ -1035,22 +1060,10 @@ def sales_history_view(request):
 def sales_report_view(request):
     """
     Génère un rapport détaillé des ventes pour une période donnée.
-
-    Améliorations apportées :
-    - Ajout du décorateur @login_required.
-    - Utilisation de 'parse_date' pour la validation des dates.
-    - Optimisation des agrégations et des annotations pour les statistiques.
-    - Gestion des erreurs avec des messages appropriés.
-
-    Bonnes pratiques Django :
-    - Utiliser les fonctions d'agrégation pour obtenir des statistiques précises.
-    - Préférer 'TruncDate' pour les regroupements par date.
     """
-    # Calcul du chiffre d'affaires du jour
     today = timezone.now().date()
     total_sales_today = Transaction.objects.filter(date__date=today).aggregate(Sum('total_price'))['total_price__sum'] or 0
 
-    today = timezone.now().date()
     start_of_week = today - timedelta(days=today.weekday())
 
     start_date_str = request.GET.get('start_date')
@@ -1063,40 +1076,63 @@ def sales_report_view(request):
         start_date, end_date = start_of_week, today
         messages.error(request, "Les dates fournies sont invalides ou incohérentes. Période par défaut utilisée.")
 
-    sales_data = Transaction.objects.filter(date__date__range=[start_date, end_date])
+    # Récupérer les transactions dans la plage de dates
+    transactions = Transaction.objects.filter(date__date__range=[start_date, end_date])
 
-    total_sales = sales_data.aggregate(total=Sum('total_price'))['total'] or Decimal('0.00')
-    total_discounts = sales_data.aggregate(total=Sum('total_reduction'))['total'] or Decimal('0.00')
-    total_transactions = sales_data.count()
-
-    # Répartition par mode de paiement
-    payment_distribution = sales_data.values('mode_paiement').annotate(
-        total_sales=Sum('total_price'),
-        total_transactions=Count('uuid')
-    )
-
-    # Top produits
-    top_products = TransactionItem.objects.filter(transaction__in=sales_data).values('product__nom_article').annotate(
-        total_quantity=Sum('quantity'),
-        total_sales=Sum('price')
-    ).order_by('-total_sales')[:10]
-
-    # Ventes par catégorie
-    sales_by_category = TransactionItem.objects.filter(transaction__in=sales_data).values('product__categorie').annotate(
-        total_sales=Sum('price')
-    ).order_by('-total_sales')
+    total_sales = transactions.aggregate(total=Sum('total_price'))['total'] or Decimal('0.00')
+    total_discounts = transactions.aggregate(total=Sum('total_reduction'))['total'] or Decimal('0.00')
+    total_transactions = transactions.count()
 
     # Moyenne des ventes par jour
     days_in_period = (end_date - start_date).days + 1
     avg_sales_per_day = (total_sales / days_in_period).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) if days_in_period > 0 else Decimal('0.00')
 
     # Ventes quotidiennes
-    daily_sales = sales_data.annotate(day=TruncDate('date')).values('day').annotate(
+    daily_sales = transactions.annotate(day=TruncDate('date')).values('day').annotate(
         total_sales=Sum('total_price')
     ).order_by('day')
 
     sales_dates = [sale['day'].strftime('%Y-%m-%d') for sale in daily_sales]
     sales_amounts = [float(sale['total_sales']) for sale in daily_sales]
+
+    # Répartition par mode de paiement
+    payment_distribution = PaymentDetail.objects.filter(
+        transaction__date__date__range=[start_date, end_date]
+    ).values('method').annotate(
+        total_sales=Sum('amount'),
+        total_transactions=Count('transaction', distinct=True)
+    )
+
+    # Map method to human-readable label if needed
+    payment_method_labels = {
+        'cash': 'Espèces',
+        'card': 'Carte',
+        'gift': 'Cadeau',
+        'voucher': 'Bon',
+        'transfer': 'Virement',
+        'credit': 'Crédit',
+    }
+
+    # Convertir en liste et ajouter les labels
+    payment_distribution = list(payment_distribution)
+    for payment in payment_distribution:
+        method = payment['method']
+        payment['method_label'] = payment_method_labels.get(method, method.capitalize())
+
+    # Top produits
+    top_products = TransactionItem.objects.filter(
+        transaction__in=transactions
+    ).values('product__nom_article').annotate(
+        total_quantity=Sum('quantity'),
+        total_sales=Sum('price')
+    ).order_by('-total_sales')[:10]
+
+    # Ventes par catégorie
+    sales_by_category = TransactionItem.objects.filter(
+        transaction__in=transactions
+    ).values('product__categorie').annotate(
+        total_sales=Sum('price')
+    ).order_by('-total_sales')
 
     context = {
         'total_sales': total_sales,
@@ -1114,7 +1150,6 @@ def sales_report_view(request):
     }
 
     return render(request, 'sales_report.html', context)
-
 
 # Fonction pour générer un rapport PDF
 @login_required
@@ -1168,45 +1203,37 @@ def generate_pdf_report(request):
 # Vue pour ajuster le stock d'un produit
 @login_required
 def update_stock(request):
-    """
-    Permet de mettre à jour le stock d'un produit.
-    """
     if request.method == 'POST':
         product_id = request.POST.get('product_id')
-        product = get_object_or_404(Product, id=product_id)
-        form = StockUpdateForm(request.POST, instance=product)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f"Le stock du produit '{product.nom_article}' a été mis à jour avec succès.")
-        else:
-            messages.error(request, "Erreur lors de la mise à jour du stock.")
-    return redirect('pos')
+        new_stock = request.POST.get('new_stock')
 
+        try:
+            new_stock = int(new_stock)
+            if new_stock < 0:
+                messages.error(request, "Le stock ne peut pas être négatif.")
+                return redirect('pos')
+        except ValueError:
+            messages.error(request, "La quantité en stock doit être un nombre entier.")
+            return redirect('pos')
+
+        product = get_object_or_404(Product, id=product_id)
+        product.quantite = new_stock
+        product.save()
+        messages.success(request, f"Le stock du produit '{product.nom_article}' a été mis à jour avec succès.")
+    else:
+        messages.error(request, "Méthode non autorisée.")
+    return redirect('pos')
 
 # Vue pour générer un ticket de caisse
 @login_required
 def generate_ticket_de_caisse(request, transaction_pk):
-    """
-    Génère un ticket de caisse pour une transaction donnée.
-
-    Améliorations apportées :
-    - Ajout du décorateur @login_required.
-    - Optimisation des requêtes avec 'select_related' et 'prefetch_related'.
-    - Gestion des cas où la transaction ou le client n'existe pas.
-
-    Bonnes pratiques Django :
-    - Sécuriser l'accès aux informations sensibles.
-    - Utiliser des templates pour le rendu du ticket.
-    """
     transaction = get_object_or_404(Transaction, pk=transaction_pk)
     client = transaction.client
     transaction_items = TransactionItem.objects.filter(transaction=transaction).select_related('product')
 
-    points_gagnes = transaction.points_gagnes
-
-    total_vente = transaction.total_price
+    total_price = transaction.total_price + transaction.total_reduction
     total_reduction = transaction.total_reduction
-    total_a_payer = total_vente - total_reduction
+    total_a_payer = transaction.total_price
 
     items_with_totals = []
     for item in transaction_items:
@@ -1216,24 +1243,27 @@ def generate_ticket_de_caisse(request, transaction_pk):
             'total': total_item
         })
 
+    # Récupérer les méthodes de paiement
+    payment_methods = transaction.payments.all()
+
+
     context = {
         'shop_logo_url': '/static/images/shop_logo.png',  # Adapter le chemin si nécessaire
         'transaction_date': transaction.date.strftime('%d/%m/%Y %H:%M'),
         'client_firstname': client.prenom if client else "Anonyme",
         'client_lastname': client.nom if client else "",
-        'mode_paiement': transaction.get_mode_paiement_display(),
         'transaction_items': items_with_totals,
-        'total_vente': total_vente,
+        'total_price': total_price,
         'total_reduction': total_reduction,
         'total_a_payer': total_a_payer,
         'transaction': transaction,
         'client': client,
         'credit_applied': transaction.credit_applied,
-        'points_gagnes': points_gagnes,
+        'points_gagnes': transaction.points_gagnes,
+        'payment_methods': payment_methods,
     }
 
     return render(request, 'ticket_de_caisse.html', context)
-
 
 # Vue pour gérer les retours d'articles
 @login_required
@@ -1241,37 +1271,42 @@ def generate_ticket_de_caisse(request, transaction_pk):
 def manage_return(request, transaction_pk):
     """
     Gère les retours pour une transaction donnée.
-
-    Améliorations apportées :
-    - Ajout des décorateurs @login_required et @transaction.atomic.
-    - Validation des entrées utilisateur.
-    - Mise à jour du stock et du crédit client de manière sécurisée.
-    - Calcul correct des points de fidélité à retirer lors du retour.
-    - Enregistrement des points retirés dans le modèle Return.
-
-    Bonnes pratiques Django :
-    - Vérifier les permissions avant d'autoriser des opérations sensibles.
-    - Utiliser des formulaires pour gérer les entrées utilisateur.
-    - Utiliser des méthodes du modèle pour ajuster les points de fidélité du client.
     """
-    # Calcul du chiffre d'affaires du jour
-    today = timezone.now().date()
-    total_sales_today = Transaction.objects.filter(date__date=today).aggregate(Sum('total_price'))['total_price__sum'] or 0
-
     transaction = get_object_or_404(Transaction, pk=transaction_pk)
     transaction_items = transaction.items.select_related('product').all()
     client = transaction.client
 
+    # Construction des données pour chaque article
+    items_with_status = []
+    for item in transaction_items:
+        is_promotion_applied = item.promotion_applied or item.reduction > Decimal('0.00')
+        max_returnable_quantity = item.quantity - item.returned_quantity
+        is_fully_returned = item.returned_quantity == item.quantity
+
+        # Retour impossible si l'article est en promotion ou déjà retourné
+        is_return_impossible = is_promotion_applied or is_fully_returned
+
+        items_with_status.append({
+            'item': item,
+            'is_promotion_applied': is_promotion_applied,
+            'max_returnable_quantity': max_returnable_quantity,
+            'is_fully_returned': is_fully_returned,
+            'is_return_impossible': is_return_impossible,
+        })
+
     if request.method == 'POST':
-        for item in transaction_items:
+        for item_data in items_with_status:
+            item = item_data['item']
             quantity_to_return = int(request.POST.get(f'quantity_returned_{item.id}', 0))
 
-            if quantity_to_return > 0:
-                # Vérifier si une promotion a été appliquée sur l'article
-                if item.promotion_applied:
-                    messages.error(request, f"Le produit '{item.product.nom_article}' a bénéficié d'une promotion et ne peut pas être retourné.")
-                    continue  # Passer à l'article suivant
+            if item_data['is_return_impossible']:
+                messages.error(
+                    request,
+                    f"Retour impossible pour l'article '{item.product.nom_article}' (en promotion ou déjà retourné)."
+                )
+                continue
 
+            if quantity_to_return > 0:
                 total_returnable_quantity = item.quantity - item.returned_quantity
                 if quantity_to_return > total_returnable_quantity:
                     messages.error(request, f"Quantité de retour invalide pour '{item.product.nom_article}'.")
@@ -1281,7 +1316,7 @@ def manage_return(request, transaction_pk):
                 item.product.quantite += quantity_to_return
                 item.product.save()
 
-                # Calcul du montant du remboursement (prix de vente)
+                # Calcul du remboursement
                 refund_amount = (item.price * quantity_to_return).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
                 # Mise à jour du crédit du client
@@ -1290,16 +1325,10 @@ def manage_return(request, transaction_pk):
                     client.save()
 
                 # Calcul des points de fidélité à retirer
-                points_to_remove = Decimal('0.00')
-                if item.points_gagnes > Decimal('0.00'):
-                    ratio = Decimal(quantity_to_return) / Decimal(item.quantity)
-                    points_to_remove = (item.points_gagnes * ratio).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-
-                    # Mise à jour des points de fidélité du client
-                    client.fidelity_points -= points_to_remove
+                points_to_remove = (item.points_gagnes * Decimal(quantity_to_return) / Decimal(item.quantity)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                if points_to_remove > 0:
+                    client.fidelity_points = max(client.fidelity_points - points_to_remove, Decimal('0.00'))
                     client.save()
-
-                    messages.success(request, f"{points_to_remove} points de fidélité retirés du compte du client.")
 
                 # Enregistrement du retour
                 Return.objects.create(
@@ -1309,20 +1338,25 @@ def manage_return(request, transaction_pk):
                     points_removed=points_to_remove
                 )
 
-                # Mise à jour de la quantité retournée pour l'item de transaction
+                # Mise à jour des quantités retournées
                 item.returned_quantity += quantity_to_return
                 item.save()
 
-                messages.success(request, f"{quantity_to_return} x {item.product.nom_article} retourné. Crédit de {refund_amount} € ajouté au compte du client.")
+                # Message de succès
+                messages.success(
+                    request,
+                    f"{quantity_to_return} x {item.product.nom_article} retourné avec succès. Crédit de {refund_amount} € ajouté au compte du client."
+                )
+                if points_to_remove > 0:
+                    messages.success(request, f"{points_to_remove} points de fidélité retirés du compte du client.")
 
-        return redirect('transaction_detail', transaction_pk=transaction.uuid)
+            # Redirection vers la même page pour actualiser les données
+        return redirect('manage_return', transaction_pk=transaction.pk)
 
     context = {
         'transaction': transaction,
-        'items': transaction_items,
-        'total_sales_today': total_sales_today,
+        'items_with_status': items_with_status,
     }
-
     return render(request, 'manage_return.html', context)
 
 @login_required
@@ -1668,3 +1702,5 @@ def search_client_eid(request):
         return JsonResponse(response_data)
     else:
         return JsonResponse({'success': False, 'message': 'Méthode non autorisée'}, status=405)
+    
+

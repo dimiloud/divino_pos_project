@@ -1,9 +1,10 @@
-<!-- @ts-nocheck -->
+<!-- templates/divino_pos/sales_report.html -->
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="container-fluid px-4">
-    <h1 class="mt-4">Rapport des ventes</h1>
+    <h1 class="mt-4">Rapport des Ventes</h1>
 
     <!-- Formulaire pour la sélection de la période -->
     <div class="row mt-4">
@@ -12,13 +13,13 @@
                 <div class="form-group row">
                     <label for="start_date" class="col-sm-3 col-form-label">Date de début :</label>
                     <div class="col-sm-9">
-                        <input type="date" id="start_date" name="start_date" class="form-control" value="{{ start_date }}">
+                        <input type="date" id="start_date" name="start_date" class="form-control" value="{{ start_date|date:'Y-m-d' }}">
                     </div>
                 </div>
                 <div class="form-group row mt-3">
                     <label for="end_date" class="col-sm-3 col-form-label">Date de fin :</label>
                     <div class="col-sm-9">
-                        <input type="date" id="end_date" name="end_date" class="form-control" value="{{ end_date }}">
+                        <input type="date" id="end_date" name="end_date" class="form-control" value="{{ end_date|date:'Y-m-d' }}">
                     </div>
                 </div>
                 <div class="form-group row mt-3">
@@ -58,8 +59,8 @@
                 <tbody>
                     {% for payment in payment_distribution %}
                     <tr>
-                        <td>{{ payment.mode_paiement|capfirst }}</td>
-                        <td>{{ payment.total_sales|floatformat:2 }}</td>
+                        <td>{{ payment.method_label }}</td>
+                        <td>{{ payment.total_sales|floatformat:2 }} €</td>
                         <td>{{ payment.total_transactions }}</td>
                     </tr>
                     {% endfor %}
@@ -118,7 +119,7 @@
         </div>
     </div>
 
-    <!-- Section des graphiques -->
+    <!-- Section des Graphiques -->
     <div class="row mt-5">
         <div class="col-md-12">
             <h3>Graphique des Ventes par Jour</h3>
@@ -129,7 +130,7 @@
     <!-- Bouton pour télécharger le rapport PDF -->
     <div class="row mt-4">
         <div class="col-md-12 text-end">
-            <a href="{% url 'sales_report_pdf' %}?start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-secondary">
+            <a href="{% url 'sales_report_pdf' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="btn btn-secondary">
                 Télécharger le rapport PDF
             </a>
         </div>
@@ -139,34 +140,47 @@
 <!-- Script pour Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+    // Graphique des Ventes par Jour
     var ctx = document.getElementById('salesChart').getContext('2d');
     var salesChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: {{ sales_dates|safe }},
+            labels: {{ sales_dates|safe }}, // Doit être une liste de dates au format string
             datasets: [{
                 label: 'Ventes (€)',
-                data: {{ sales_amounts|safe }},
+                data: {{ sales_amounts|safe }}, // Doit être une liste de montants correspondants
                 backgroundColor: 'rgba(54, 162, 235, 0.2)',
                 borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 2
+                borderWidth: 2,
+                fill: true
             }]
         },
         options: {
+            responsive: true,
             scales: {
                 y: {
-                    beginAtZero: true
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Montant (€)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    }
                 }
             }
         }
     });
 
-    // Graphique pour la répartition des ventes par mode de paiement
+    // Graphique de la Répartition des Ventes par Mode de Paiement
     var paymentCtx = document.getElementById('paymentChart').getContext('2d');
     var paymentData = {
         labels: [
             {% for payment in payment_distribution %}
-                '{{ payment.mode_paiement|capfirst }}',
+                '{{ payment.method_label }}',
             {% endfor %}
         ],
         datasets: [{
@@ -176,8 +190,21 @@
                     {{ payment.total_sales }},
                 {% endfor %}
             ],
-            backgroundColor: ['#007bff', '#28a745'],
-            borderColor: '#ffffff',
+            backgroundColor: [
+                // Vous pouvez personnaliser les couleurs
+                'rgba(75, 192, 192, 0.2)',
+                'rgba(255, 159, 64, 0.2)',
+                'rgba(255, 205, 86, 0.2)',
+                'rgba(153, 102, 255, 0.2)',
+                'rgba(201, 203, 207, 0.2)'
+            ],
+            borderColor: [
+                'rgba(75, 192, 192, 1)',
+                'rgba(255, 159, 64, 1)',
+                'rgba(255, 205, 86, 1)',
+                'rgba(153, 102, 255, 1)',
+                'rgba(201, 203, 207, 1)'
+            ],
             borderWidth: 1
         }]
     };

@@ -73,7 +73,7 @@
                         </div>
                         {% endif %}
                     </div>
-
+                    
                     <button class="btn btn-outline-primary w-100 mt-3" 
                             onclick="openGlobalReductionModal()">
                         <i class="fas fa-percent me-2"></i>Réduction globale
@@ -218,27 +218,29 @@
                                 <small class="text-muted">{{ selected_client.email }}</small>
                             </div>
                         </div>
-
                         <div class="client-stats">
+                        {% if selected_client.credit > 0 %}
                             <div class="d-flex justify-content-between mb-2">
-                                <span>Crédit</span>
-                                <span class="badge bg-success">{{ selected_client.credit|floatformat:2 }} €</span>
+                                <h5><span>Crédit</span></h5>
+                                <span class="badge bg-info"><h5>{{ selected_client.credit|floatformat:2 }} €</h5></span>
                             </div>
+                        {% endif %}
+                        {% if selected_client.fidelity_points > 0 %}
                             <div class="d-flex justify-content-between mb-2">
-                                <span>Points fidélité</span>
-                                <span class="badge bg-warning">{{ selected_client.fidelity_points|floatformat:2 }}</span>
+                                <h5><span>Points fidélité</span></h5>
+                                <span class="badge bg-warning"><h5>{{ selected_client.fidelity_points|floatformat:2 }}</h5></span>
                             </div>
+                            {% endif %}
                         </div>
-
                         {% if panier %}
                         <div class="mt-3">
-                            {% if selected_client.credit > 0 %}
+                            <!--{% if selected_client.credit > 0 %}
                             <button class="btn btn-outline-success w-100 mb-2" 
                                     data-bs-toggle="modal" 
                                     data-bs-target="#confirmApplyCreditModal">
                                 <i class="fas fa-coins me-2"></i>Utiliser le crédit
                             </button>
-                            {% endif %}
+                            {% endif %}-->
 
                             {% if selected_client.fidelity_points > 0 %}
                             <form method="POST" action="{% url 'pos' %}">
@@ -277,96 +279,252 @@
                 </div>
                 {% endfor %}
             </div>
-            {% endif %}
+            {% endif %} 
         </div>
     </div>
 </div>
-<script src="{% static 'admin/js/eid_card.js' %}"></script>
 <!-- Inclure les modales -->
-{% include 'divino_pos/modals/payment_modal.html' %}
-{% include 'divino_pos/modals/stock_modal.html' %}
+{% include 'divino_pos/modals/addproduct_modal.html' %}
+{% include 'divino_pos/modals/add_client_modal.html' %}
 {% include 'divino_pos/modals/client_search_modal.html' %}
 {% include 'divino_pos/modals/reduction_modal.html' %}
 {% include 'divino_pos/modals/global_reduction_modal.html' %}
-{% include 'divino_pos/modals/confirm_credit_modal.html' %}
-{% include 'divino_pos/modals/addproduct_modal.html' %}
-{% include 'divino_pos/modals/add_client_modal.html' %}
+{% include 'divino_pos/modals/stock_modal.html' %}
+{% include 'divino_pos/modals/payment_modal.html' %}
 
-<!-- Scripts -->
+<!-- SECTION SCRIPTS -->
+{% if show_add_client_modal %}
 <script>
-// Initialisation des modales
-document.addEventListener('DOMContentLoaded', function() {
-    {% if show_add_client_modal %}
-    new bootstrap.Modal(document.getElementById('addClientModal')).show();
-    {% endif %}
-
-    {% if show_stock_modal %}
-    new bootstrap.Modal(document.getElementById('stockModal')).show();
-    {% endif %}
-
-    {% if show_client_search_modal %}
-    new bootstrap.Modal(document.getElementById('clientSearchModal')).show();
-    {% endif %}
-});
-
-// Fonctions pour les modales
-function openReductionModal(button) {
-    const codeEan = button.getAttribute('data-code-ean');
-    document.getElementById('code_ean_input').value = codeEan;
-    new bootstrap.Modal(document.getElementById('reductionModal')).show();
-}
-
-function openGlobalReductionModal() {
-    new bootstrap.Modal(document.getElementById('globalReductionModal')).show();
-}
-
-// Fonction pour la lecture eID
-async function fetchClientDataForSearch() {
-    try {
-        const response = await fetch('{% url "read_eid_data" %}');
-        const data = await response.json();
-        
-        if (data.success) {
-            const searchData = {
-                nom: data.data.nom,
-                prenom: data.data.prenom,
-                date_naissance: data.data.date_naissance
-            };
-            
-            await searchClientByEID(searchData);
-        } else {
-            alert(data.message || 'Erreur lors de la lecture de la carte eID');
+    document.addEventListener('DOMContentLoaded', function() {
+        var addClientModal = new bootstrap.Modal(document.getElementById('addClientModal'));
+        addClientModal.show();
+    });
+</script>
+{% endif %}
+<script>
+    function openReductionModal(button) {
+        var codeEan = button.getAttribute('data-code-ean');
+        var codeEanInput = document.getElementById('code_ean_input');
+        if (codeEanInput) {
+            codeEanInput.value = codeEan;
         }
-    } catch (error) {
-        console.error('Erreur:', error);
-        alert('Erreur lors de la lecture de la carte eID');
-    }
-}
 
-async function searchClientByEID(clientData) {
-    try {
-        const response = await fetch('{% url "search_client_eid" %}', {
+        var reductionModalElement = document.getElementById('reductionModal');
+        if (reductionModalElement) {
+            var reductionModal = new bootstrap.Modal(reductionModalElement);
+            reductionModal.show();
+        } else {
+            console.error('Modal réduction non trouvé.');
+        }
+    }
+
+    function openGlobalReductionModal() {
+        var globalReductionModalElement = document.getElementById('globalReductionModal');
+        if (globalReductionModalElement) {
+            var globalReductionModal = new bootstrap.Modal(globalReductionModalElement);
+            globalReductionModal.show();
+        } else {
+            console.error('Modal réduction globale non trouvé.');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // {% if show_stock_modal %}
+        var stockModalElement = document.getElementById('stockModal');
+        if (stockModalElement) {
+            var stockModal = new bootstrap.Modal(stockModalElement);
+            stockModal.show();
+        } else {
+            console.error('Modal stock non trouvé.');
+        }
+        // {% endif %}
+
+        // {% if show_client_search_modal %}
+        var clientSearchModalElement = document.getElementById('clientSearchModal');
+        if (clientSearchModalElement) {
+            var clientSearchModal = new bootstrap.Modal(clientSearchModalElement);
+            clientSearchModal.show();
+        } else {
+            console.error('Modal recherche client non trouvé.');
+        }
+        // {% endif %}
+    });
+</script>
+<script>
+function fetchClientData() {
+    const endpoints = [
+        'https://monsite.local:5000/read_card', // Adresse magasin
+        'https://192.168.10.148:5000/read_card', // Adresse atelier
+        'https://192.168.129.134:5000/read_card', // Adresse maison
+    ];
+
+    // Fonction récursive pour essayer les endpoints
+    function tryFetch(index) {
+        if (index >= endpoints.length) {
+            alert('Erreur : Impossible de récupérer les données de la carte eID. Vérifiez votre connexion ou les adresses.');
+            return;
+        }
+
+        const controller = new AbortController(); // Pour gérer le délai d'expiration
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // Délai d'expiration : 5 secondes
+
+        fetch(endpoints[index], {
+            method: 'GET',
+            mode: 'cors',
+            credentials: 'same-origin',
+            signal: controller.signal
+        })
+        .then(response => {
+            clearTimeout(timeoutId); // Annuler le timeout si succès
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP : ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            for (let key in data) {
+                if (typeof data[key] === 'string') {
+                    data[key] = decodeURIComponent(escape(data[key]));
+                }
+            }
+            if (data.Nom && data.Prénom && data['Date de naissance']) {
+                const mois = {
+                    'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04',
+                    'MAY': '05', 'JUN': '06', 'JUL': '07', 'AUG': '08',
+                    'SEP': '09', 'OCT': '10', 'NOV': '11', 'DEC': '12',
+                    'JANV': '01', 'FEVR': '02', 'MARS': '03', 'AVR': '04',
+                    'MAI': '05', 'JUIN': '06', 'JUIL': '07', 'AOUT': '08',
+                    'SEPT': '09', 'OCT': '10', 'NOV': '11', 'DÉC': '12'
+                };
+
+                let dateNaissance = data['Date de naissance'].trim();
+                let [jour, moisStr, annee] = dateNaissance.split(' ').filter(part => part);
+                jour = jour.padStart(2, '0');
+                let moisNum = mois[moisStr.toUpperCase()];
+                let dateFormatee = `${jour}.${moisNum}.${annee}`;
+
+                document.getElementById("id_nom").value = data.Nom;
+                document.getElementById("id_prenom").value = data.Prénom;
+                document.getElementById("id_date_anniversaire").value = dateFormatee;
+                document.getElementById("id_numero_rue").value = data['Numéro et rue'];
+                document.getElementById("id_code_postal").value = data['Code postal'];
+                document.getElementById("id_ville").value = data['Ville'];
+                document.getElementById("id_pays").value = data['Pays'];
+
+            } else {
+                alert('Erreur : Données incomplètes reçues de la carte eID.');
+            }
+        })
+        .catch(error => {
+            clearTimeout(timeoutId); // Annuler le timeout en cas d'erreur
+            console.warn(`Erreur sur ${endpoints[index]} : ${error.message}`);
+            tryFetch(index + 1); // Essayer l'adresse suivante
+        });
+    }
+
+    tryFetch(0); // Démarrer la tentative à partir du premier endpoint
+}
+</script>
+<script>
+    function fetchClientDataForSearch() {
+        const endpoints = [
+            'https://monsite.local:5000/read_card', // Adresse magasin
+            'https://192.168.10.148:5000/read_card', // Adresse atelier
+            'https://192.168.129.134:5000/read_card', // Adresse maison
+        ];
+    
+        function tryFetch(index) {
+            if (index >= endpoints.length) {
+                alert('Erreur : Impossible de récupérer les données de la carte eID. Vérifiez votre connexion ou les adresses.');
+                return;
+            }
+    
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+            fetch(endpoints[index], {
+                method: 'GET',
+                mode: 'cors',
+                credentials: 'same-origin',
+                signal: controller.signal
+            })
+            .then(response => {
+                clearTimeout(timeoutId);
+                if (!response.ok) {
+                    throw new Error(`Erreur HTTP : ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                for (let key in data) {
+                    if (typeof data[key] === 'string') {
+                     data[key] = decodeURIComponent(escape(data[key]));
+                    }
+                }
+                if (data.Nom && data.Prénom && data['Date de naissance']) {
+                    const mois = {
+                        'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04',
+                        'MAY': '05', 'JUN': '06', 'JUL': '07', 'AUG': '08',
+                        'SEP': '09', 'OCT': '10', 'NOV': '11', 'DEC': '12',
+                        'JANV': '01', 'FEVR': '02', 'MARS': '03', 'AVR': '04',
+                        'MAI': '05', 'JUIN': '06', 'JUIL': '07', 'AOUT': '08',
+                        'SEPT': '09', 'OCT': '10', 'NOV': '11', 'DÉC': '12'
+                    };
+    
+                    let dateNaissance = data['Date de naissance'].trim();
+                    let [jour, moisStr, annee] = dateNaissance.split(' ').filter(part => part);
+                    jour = jour.padStart(2, '0');
+                    let moisNum = mois[moisStr.toUpperCase()];
+                    let dateFormatee = `${annee}-${moisNum}-${jour}`; // Format YYYY-MM-DD
+    
+                    // Préparer les données pour la recherche
+                    let clientData = {
+                        n_carte: data['Numéro de carte'],
+                        nom: data.Nom,
+                        prenom: data.Prénom,
+                        date_naissance: dateFormatee
+                    };
+    
+                    // Envoyer les données au serveur pour rechercher le client
+                    searchClientByEID(clientData);
+                } else {
+                    alert('Erreur : Données incomplètes reçues de la carte eID.');
+                }
+            })
+            .catch(error => {
+                clearTimeout(timeoutId);
+                console.warn(`Erreur sur ${endpoints[index]} : ${error.message}`);
+                tryFetch(index + 1);
+            });
+        }
+    
+        tryFetch(0);
+    }
+    
+    function searchClientByEID(clientData) {
+        fetch('{% url "search_client_eid" %}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                'X-CSRFToken': getCSRFToken()
             },
             body: JSON.stringify(clientData)
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            window.location.reload();
-        } else {
-            if (confirm(data.message + '\nVoulez-vous créer un nouveau client ?')) {
-                new bootstrap.Modal(document.getElementById('addClientModal')).show();
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`Client trouvé : ${data.client.prenom} ${data.client.nom}`);
+                // Mettre à jour l'interface avec les données du client
+                window.location.href = '{% url "pos" %}';
+            } else {
+                alert(data.message);
             }
-        }
-    } catch (error) {
-        console.error('Erreur:', error);
-        alert('Erreur lors de la recherche du client');
+        })
+        .catch(error => console.error('Erreur:', error));
     }
-}
-</script>
+    
+    function getCSRFToken() {
+        return document.querySelector('[name=csrfmiddlewaretoken]').value;
+    }
+    </script>
 {% endblock %}

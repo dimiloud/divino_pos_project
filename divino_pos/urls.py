@@ -37,7 +37,7 @@ urlpatterns = [
 
     # Historique des ventes et rapports
     path('sales-history/', views.sales_history_view, name='sales_history'),
-    path('sales-report/', views.sales_report_view, name='sales_report'),
+    path('sales-report/', views.sales_report_view, name='sales_report'), 
     path('sales-report/pdf/', views.generate_pdf_report, name='sales_report_pdf'),
 
     # Gestion des retours

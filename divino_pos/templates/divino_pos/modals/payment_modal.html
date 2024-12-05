@@ -1,3 +1,4 @@
+{% load custom_filters %}
 <!-- Modal de paiement -->
 <div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -19,6 +20,27 @@
                         <div class="col-md-6">
                             <h6 class="mb-3">Méthodes de paiement</h6>
                             <div class="payment-methods">
+                                <!-- Méthode Crédit Client -->
+                                {% if selected_client and selected_client.credit > 0 %}
+                                <div class="mb-3">
+                                    <button type="button" class="btn btn-outline-info w-100 payment-method-btn" id="btnCredit">
+                                        <i class="fas fa-wallet me-2"></i>Crédit Client
+                                    </button>
+                                    <div id="creditInput" class="payment-input mt-2 d-none">
+                                        <div class="input-group">
+                                            <span class="input-group-text">€</span>
+                                            <input type="number" 
+                                                   id="creditAmountInput" 
+                                                   class="form-control" 
+                                                   min="0" 
+                                                   step="0.01" 
+                                                   placeholder="Montant" 
+                                                   max="{{ selected_client.credit|floatformat:2 }}">
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                <!-- Méthode Espèces -->
                                 <div class="mb-3">
                                     <button type="button" class="btn btn-outline-success w-100 payment-method-btn" id="btnCash">
                                         <i class="fas fa-money-bill-wave me-2"></i>Espèces
@@ -36,6 +58,7 @@
                                     </div>
                                 </div>
 
+                                <!-- Méthode Carte bancaire -->
                                 <div class="mb-3">
                                     <button type="button" class="btn btn-outline-primary w-100 payment-method-btn" id="btnCard">
                                         <i class="fas fa-credit-card me-2"></i>Carte bancaire
@@ -53,6 +76,7 @@
                                     </div>
                                 </div>
 
+                                <!-- Méthode Chèque cadeau -->
                                 <div class="mb-3">
                                     <button type="button" class="btn btn-outline-warning w-100 payment-method-btn" id="btnGift">
                                         <i class="fas fa-gift me-2"></i>Chèque cadeau
@@ -62,40 +86,6 @@
                                             <span class="input-group-text">€</span>
                                             <input type="number" 
                                                    id="giftAmountInput" 
-                                                   class="form-control" 
-                                                   min="0" 
-                                                   step="0.01" 
-                                                   placeholder="Montant">
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="mb-3">
-                                    <button type="button" class="btn btn-outline-info w-100 payment-method-btn" id="btnVoucher">
-                                        <i class="fas fa-ticket-alt me-2"></i>Bon d'achat
-                                    </button>
-                                    <div id="voucherInput" class="payment-input mt-2 d-none">
-                                        <div class="input-group">
-                                            <span class="input-group-text">€</span>
-                                            <input type="number" 
-                                                   id="voucherAmountInput" 
-                                                   class="form-control" 
-                                                   min="0" 
-                                                   step="0.01" 
-                                                   placeholder="Montant">
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="mb-3">
-                                    <button type="button" class="btn btn-outline-secondary w-100 payment-method-btn" id="btnTransfer">
-                                        <i class="fas fa-university me-2"></i>Virement bancaire
-                                    </button>
-                                    <div id="transferInput" class="payment-input mt-2 d-none">
-                                        <div class="input-group">
-                                            <span class="input-group-text">€</span>
-                                            <input type="number" 
-                                                   id="transferAmountInput" 
                                                    class="form-control" 
                                                    min="0" 
                                                    step="0.01" 
@@ -118,37 +108,32 @@
                                     <div class="mb-4">
                                         <div class="d-flex justify-content-between mb-2">
                                             <span>Total à payer</span>
-                                            <strong>{{ total_a_payer|floatformat:2 }} €</strong>
+                                            <strong>{{ total_a_payer|floatformat:2|default:"0.00" }} €</strong>
+                                        </div>
+                                        {% if selected_client and selected_client.credit > 0 %}
+                                        <div class="d-flex justify-content-between text-muted mb-2">
+                                            <span>Crédit client</span>
+                                            <span id="creditAmount">0,00 €</span>
+                                        </div>
+                                        {% endif %}
+                                        <div class="d-flex justify-content-between text-muted mb-2">
+                                            <span>Espèces</span>
+                                            <span id="cashAmount">0,00 €</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between text-muted mb-2">
+                                            <span>Carte bancaire</span>
+                                            <span id="cardAmount">0,00 €</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between text-muted mb-2">
+                                            <span>Chèque cadeau</span>
+                                            <span id="giftAmount">0,00 €</span>
                                         </div>
                                         
-                                        <div class="payment-summary">
-                                            <div class="d-flex justify-content-between text-muted mb-2">
-                                                <span>Espèces</span>
-                                                <span id="cashAmount">0.00 €</span>
-                                            </div>
-                                            <div class="d-flex justify-content-between text-muted mb-2">
-                                                <span>Carte bancaire</span>
-                                                <span id="cardAmount">0.00 €</span>
-                                            </div>
-                                            <div class="d-flex justify-content-between text-muted mb-2">
-                                                <span>Chèque cadeau</span>
-                                                <span id="giftAmount">0.00 €</span>
-                                            </div>
-                                            <div class="d-flex justify-content-between text-muted mb-2">
-                                                <span>Bon d'achat</span>
-                                                <span id="voucherAmount">0.00 €</span>
-                                            </div>
-                                            <div class="d-flex justify-content-between text-muted mb-2">
-                                                <span>Virement</span>
-                                                <span id="transferAmount">0.00 €</span>
-                                            </div>
-                                        </div>
-
                                         <hr>
 
                                         <div class="d-flex justify-content-between">
                                             <strong>Reste à payer</strong>
-                                            <strong class="text-danger" id="remainingAmount">{{ total_a_payer|floatformat:2 }} €</strong>
+                                            <strong id="remainingAmount">{{ total_a_payer|floatformat:2|default:"0.00" }} €</strong>
                                         </div>
                                     </div>
 
@@ -156,7 +141,7 @@
                                     <div id="changeContainer" class="alert alert-success mb-0 d-none">
                                         <div class="d-flex justify-content-between">
                                             <span>Monnaie à rendre</span>
-                                            <strong id="changeAmount">0.00 €</strong>
+                                            <strong id="changeAmount">0,00 €</strong>
                                         </div>
                                     </div>
                                 </div>
@@ -165,11 +150,12 @@
                     </div>
 
                     <!-- Champs cachés pour les montants -->
-                    <input type="hidden" name="cash" id="cashHiddenInput">
-                    <input type="hidden" name="card" id="cardHiddenInput">
-                    <input type="hidden" name="gift" id="giftHiddenInput">
-                    <input type="hidden" name="voucher" id="voucherHiddenInput">
-                    <input type="hidden" name="transfer" id="transferHiddenInput">
+                    <input type="hidden" name="cash" id="cashHiddenInput" value="0.00">
+                    <input type="hidden" name="card" id="cardHiddenInput" value="0.00">
+                    <input type="hidden" name="gift" id="giftHiddenInput" value="0.00">
+                    {% if selected_client and selected_client.credit > 0 %}
+                    <input type="hidden" name="credit" id="creditHiddenInput" value="0.00">
+                    {% endif %}
                 </form>
             </div>
 
@@ -184,110 +170,156 @@
             </div>
         </div>
     </div>
-</div>
 
-<!-- Script de gestion du paiement -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const totalToPay = parseFloat('{{ total_a_payer|floatformat:2 }}');
-    let paymentDetails = {
-        cash: 0,
-        card: 0,
-        gift: 0,
-        voucher: 0,
-        transfer: 0
-    };
+    <!-- Script de gestion du paiement -->
+    <script>
+document.addEventListener('DOMContentLoaded', function () {
+  const totalToPay = parseFloat('{{ total_a_payer|floatformat:2|default:"0.00" }}'.replace(',', '.'));
+  const creditAvailable = parseFloat('{{ selected_client.credit|default:"0.00" }}'.replace(',', '.')) || 0;
 
-    // Fonction pour afficher un champ de saisie
-    function showInputField(method) {
-        // Cacher tous les champs
-        document.querySelectorAll('.payment-input').forEach(input => {
-            input.classList.add('d-none');
-        });
+  let paymentDetails = { cash: 0, card: 0, gift: 0, credit: 0 };
 
-        // Afficher le champ spécifique
-        const inputField = document.getElementById(`${method}Input`);
-        inputField.classList.remove('d-none');
-        
-        // Focus sur le champ
-        document.getElementById(`${method}AmountInput`).focus();
+  const SELECTORS = {
+    paymentError: document.getElementById('paymentError'),
+    changeContainer: document.getElementById('changeContainer'),
+    remainingAmount: document.getElementById('remainingAmount'),
+    confirmPaymentButton: document.getElementById('confirmPaymentButton')
+  };
+
+  // Fonction pour calculer le montant restant à payer
+  function calculateRemainingAmount() {
+    let totalPaid = Object.values(paymentDetails).reduce((sum, value) => sum + value, 0);
+    return Math.max(0, totalToPay - totalPaid);
+  }
+
+  // Fonction pour formater les montants en euros
+  function formatCurrency(amount) {
+    return amount.toFixed(2).replace('.', ',') + ' €';
+  }
+
+  // Fonction pour mettre à jour l'affichage des montants
+  function updateDisplayAmount(method, amount) {
+    const displayElement = document.getElementById(`${method}Amount`);
+    const hiddenInput = document.getElementById(`${method}HiddenInput`);
+    if(displayElement && hiddenInput){
+        displayElement.textContent = formatCurrency(amount);
+        hiddenInput.value = amount.toFixed(2);
+    }
+  }
+
+  // Fonction pour basculer l'affichage du champ d'entrée
+  function toggleInputField(method) {
+    const inputField = document.getElementById(`${method}Input`);
+    if (!inputField) return;
+
+    inputField.classList.toggle('d-none');
+    if (!inputField.classList.contains('d-none')) {
+      const inputElement = document.getElementById(`${method}AmountInput`);
+      const remainingAmount = calculateRemainingAmount();
+
+      if (method === 'credit') {
+        inputElement.value = Math.min(remainingAmount, creditAvailable).toFixed(2);
+      } else {
+        inputElement.value = remainingAmount > 0 ? remainingAmount.toFixed(2) : '0.00';
+      }
+      inputElement.focus();
+    }
+    updatePayment();
+  }
+
+  // Fonction pour mettre à jour les paiements
+  function updatePayment() {
+    let totalPaid = 0;
+    SELECTORS.paymentError.classList.add('d-none');
+    SELECTORS.changeContainer.classList.add('d-none');
+
+    for (let method in paymentDetails) {
+      const inputElement = document.getElementById(`${method}AmountInput`);
+      const inputField = document.getElementById(`${method}Input`);
+
+      if (inputField && !inputField.classList.contains('d-none')) {
+        let amount = parseFloat(inputElement.value.replace(',', '.')) || 0;
+
+        if (amount < 0) {
+          inputElement.classList.add('is-invalid');
+          SELECTORS.paymentError.textContent = 'Les montants ne peuvent pas être négatifs.';
+          SELECTORS.paymentError.classList.remove('d-none');
+          return;
+        }
+
+        // Vérifier les montants maximum
+        if (method === 'credit') {
+          if (amount > creditAvailable) {
+            inputElement.classList.add('is-invalid');
+            SELECTORS.paymentError.textContent = 'Le montant de crédit dépasse le crédit disponible.';
+            SELECTORS.paymentError.classList.remove('d-none');
+            return;
+          }
+        }
+
+        // Assurez-vous que l'entrée est numérique et non formatée
+        amount = Math.round(amount * 100) / 100;
+        inputElement.classList.remove('is-invalid');
+        paymentDetails[method] = amount;
+        totalPaid += amount;
+        updateDisplayAmount(method, amount);
+      } else {
+        paymentDetails[method] = 0;
+        updateDisplayAmount(method, 0);
+      }
     }
 
-    // Fonction pour mettre à jour les paiements
-    function updatePayment() {
-        let totalPaid = 0;
-        let hasError = false;
-        const paymentError = document.getElementById('paymentError');
-        const changeContainer = document.getElementById('changeContainer');
+    let remaining = Math.round((totalToPay - totalPaid) * 100) / 100;
 
-        // Réinitialiser les messages d'erreur
-        paymentError.classList.add('d-none');
-        paymentError.textContent = '';
-        changeContainer.classList.add('d-none');
+    if (remaining > 0) {
+      SELECTORS.remainingAmount.textContent = formatCurrency(remaining);
+      SELECTORS.remainingAmount.classList.add('text-danger');
+      SELECTORS.confirmPaymentButton.disabled = true;
+    } else {
+      SELECTORS.remainingAmount.textContent = '0,00 €';
+      SELECTORS.remainingAmount.classList.remove('text-danger');
+      SELECTORS.confirmPaymentButton.disabled = false;
 
-        // Calculer le total payé et vérifier les erreurs
-        for (let method in paymentDetails) {
-            const inputElement = document.getElementById(`${method}AmountInput`);
-            const amount = parseFloat(inputElement.value) || 0;
-
-            if (amount < 0) {
-                inputElement.classList.add('is-invalid');
-                hasError = true;
-                paymentError.textContent = 'Les montants ne peuvent pas être négatifs.';
-                paymentError.classList.remove('d-none');
-            } else {
-                inputElement.classList.remove('is-invalid');
-                paymentDetails[method] = amount;
-                totalPaid += amount;
-
-                // Mettre à jour l'affichage du montant
-                document.getElementById(`${method}Amount`).textContent = `${amount.toFixed(2)} €`;
-            }
-        }
-
-        // Calculer le reste à payer ou la monnaie à rendre
-        const remaining = totalToPay - totalPaid;
-        document.getElementById('remainingAmount').textContent = `${Math.abs(remaining).toFixed(2)} €`;
-
-        if (remaining < 0) {
-            // Monnaie à rendre
-            document.getElementById('changeAmount').textContent = `${Math.abs(remaining).toFixed(2)} €`;
-            changeContainer.classList.remove('d-none');
-            document.getElementById('confirmPaymentButton').disabled = false;
-        } else if (remaining === 0) {
-            // Paiement exact
-            document.getElementById('confirmPaymentButton').disabled = false;
-        } else {
-            // Paiement incomplet
-            document.getElementById('confirmPaymentButton').disabled = true;
-        }
-
-        // Mettre à jour les champs cachés
-        for (let method in paymentDetails) {
-            document.getElementById(`${method}HiddenInput`).value = paymentDetails[method].toFixed(2);
-        }
+      if (remaining < 0) {
+        document.getElementById('changeAmount').textContent = formatCurrency(Math.abs(remaining));
+        SELECTORS.changeContainer.classList.remove('d-none');
+      }
     }
+  }
 
-    // Gestionnaires d'événements pour les boutons de méthode de paiement
-    document.querySelectorAll('.payment-method-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const method = this.id.replace('btn', '').toLowerCase();
-            showInputField(method);
-        });
-    });
+  // Liste des méthodes de paiement
+  const paymentMethods = ['cash', 'card', 'gift', 'credit'];
+  paymentMethods.forEach(method => {
+    const button = document.getElementById(`btn${method.charAt(0).toUpperCase() + method.slice(1)}`);
+    const amountInput = document.getElementById(`${method}AmountInput`);
 
-    // Gestionnaires d'événements pour les champs de saisie
-    document.querySelectorAll('.payment-input input').forEach(input => {
-        input.addEventListener('input', updatePayment);
-    });
+    if(button && amountInput){
+        button.addEventListener('click', () => toggleInputField(method));
+        amountInput.addEventListener('input', updatePayment);
+    }
+  });
 
-    // Gestionnaire pour la soumission du formulaire
-    document.getElementById('paymentForm').addEventListener('submit', function(event) {
-        if (document.getElementById('confirmPaymentButton').disabled) {
-            event.preventDefault();
-            document.getElementById('paymentError').textContent = 'Le paiement n\'est pas complet.';
-            document.getElementById('paymentError').classList.remove('d-none');
-        }
-    });
+  // Validation lors de la soumission du formulaire
+  document.getElementById('paymentForm').addEventListener('submit', function (event) {
+  if (SELECTORS.confirmPaymentButton.disabled === true) {
+    event.preventDefault();
+    SELECTORS.paymentError.textContent = 'Le paiement n\'est pas complet.';
+    SELECTORS.paymentError.classList.remove('d-none');
+  }
 });
-</script>
+document.getElementById('paymentForm').addEventListener('submit', function (event) {
+  if (SELECTORS.confirmPaymentButton.disabled === true) {
+    console.log('Soumission du formulaire empêchée car le bouton de confirmation est désactivé.');
+    event.preventDefault();
+    SELECTORS.paymentError.textContent = 'Le paiement n\'est pas complet.';
+    SELECTORS.paymentError.classList.remove('d-none');
+  } else {
+    console.log('Le formulaire est en cours de soumission.');
+  }
+});
+
+
+  // Initialiser l'affichage
+  updatePayment();
+});
+    </script>

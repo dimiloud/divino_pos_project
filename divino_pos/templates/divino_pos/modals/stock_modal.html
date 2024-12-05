@@ -46,7 +46,15 @@
                     </div>
 
                     <!-- Message d'erreur -->
-                    <div id="stockError" class="alert alert-danger d-none"></div>
+                    {% if messages %}
+                        {% for message in messages %}
+                            {% if message.tags == 'error' %}
+                            <div class="alert alert-danger">
+                                {{ message }}
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
                 </form>
                 {% else %}
                 <div class="text-center py-4">
@@ -79,13 +87,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (form) {
         form.addEventListener('submit', function(event) {
-            errorDiv.classList.add('d-none');
+            if (errorDiv) {
+                errorDiv.classList.add('d-none');
+            }
             const newStock = parseInt(newStockInput.value);
 
             if (isNaN(newStock) || newStock < 0) {
                 event.preventDefault();
-                errorDiv.textContent = 'La quantité en stock doit être un nombre positif';
-                errorDiv.classList.remove('d-none');
+                if (errorDiv) {
+                    errorDiv.textContent = 'La quantité en stock doit être un nombre positif';
+                    errorDiv.classList.remove('d-none');
+                } else {
+                    alert('La quantité en stock doit être un nombre positif');
+                }
             }
         });
     }
